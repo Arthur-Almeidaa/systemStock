@@ -3,7 +3,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import {
   getFirestore, collection, addDoc, getDocs,
-  doc, deleteDoc, query, where, updateDoc, increment,
+  doc, deleteDoc, setDoc, query, where, updateDoc, increment,
   orderBy, limit, serverTimestamp,
 } from "firebase/firestore";
 
@@ -34,6 +34,18 @@ const fmtDate = (ts) => {
   return d.toLocaleString("pt-BR");
 };
 
+// Thresholds padrão se não configurados
+const DEFAULT_THRESH = { baixo: 5, medio: 15 };
+
+// Retorna status do produto baseado nos thresholds
+function getStatus(qtd, thresh) {
+  const t = thresh || DEFAULT_THRESH;
+  if (qtd <= 0)         return "zero";
+  if (qtd <= t.baixo)   return "baixo";
+  if (qtd <= t.medio)   return "medio";
+  return "alto";
+}
+
 async function registrarLog(setor, tipo, dados) {
   await addDoc(collection(db, getCol(setor, "log")), { tipo, ...dados, ts: serverTimestamp() });
 }
@@ -48,14 +60,14 @@ const styles = `
     --bg:#0a0a0a; --surface:#141414; --surface2:#1c1c1c;
     --border:#2a2a2a; --border2:#333;
     --accent:#f5a623; --accent2:#e85d04;
-    --success:#4ade80; --danger:#f87171; --info:#60a5fa;
+    --success:#4ade80; --danger:#f87171; --info:#60a5fa; --warn:#facc15;
     --text:#f0f0f0; --text-dim:#777; --text-mid:#aaa;
     --mono:'IBM Plex Mono',monospace;
     --sans:'IBM Plex Sans',sans-serif;
     --display:'Bebas Neue',sans-serif;
     --r:4px;
     --header-h:56px;
-    --bottom-h:62px;
+    --bottom-h:76px;
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -75,10 +87,10 @@ const styles = `
   .hbtn.danger:hover, .hbtn.danger:active { border-color: var(--danger); color: var(--danger); }
   .header-email { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
 
-  /* MAIN LAYOUT */
+  /* LAYOUT */
   .main-layout { display: flex; flex: 1; overflow: hidden; }
 
-  /* SIDEBAR — desktop only */
+  /* SIDEBAR — desktop */
   .sidebar { width: 200px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; }
   .sidebar-setor { padding: 14px 16px; border-bottom: 1px solid var(--border); }
   .sidebar-setor-label { font-family: var(--mono); font-size: 9px; color: var(--text-dim); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px; }
@@ -93,21 +105,61 @@ const styles = `
   /* CONTENT */
   .content { flex: 1; overflow-y: auto; padding: 24px 20px; -webkit-overflow-scrolling: touch; }
 
-  /* BOTTOM NAV — mobile only, hidden on desktop */
-  .bottom-nav { display: none; position: fixed; bottom: 0; left: 0; right: 0; height: var(--bottom-h); background: var(--surface); border-top: 1px solid var(--border); z-index: 200; }
-  .bottom-nav-inner { display: flex; height: 100%; align-items: stretch; padding-bottom: env(safe-area-inset-bottom, 0px); }
-  .bnav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; color: var(--text-dim); position: relative; -webkit-tap-highlight-color: transparent; padding: 6px 2px; }
+  /* BOTTOM NAV — mobile only */
+  .bottom-nav {
+    display: none;
+    position: fixed; bottom: 0; left: 0; right: 0;
+    height: var(--bottom-h);
+    background: var(--surface);
+    border-top: 2px solid var(--border2);
+    z-index: 300;
+  }
+  .bottom-nav-inner {
+    display: flex;
+    align-items: stretch;
+    height: calc(var(--bottom-h) - env(safe-area-inset-bottom, 0px));
+    padding: 0 6px;
+    gap: 2px;
+  }
+  .bnav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 10px 4px 8px;
+    cursor: pointer;
+    color: var(--text-dim);
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    transition: color .15s;
+    border-radius: 6px;
+    margin: 4px 0;
+  }
+  .bnav-item:active { background: var(--surface2); }
   .bnav-item.active { color: var(--accent); }
-  .bnav-item.active::after { content: ''; position: absolute; top: 0; left: 20%; right: 20%; height: 2px; background: var(--accent); }
-  .bnav-icon { font-size: 20px; line-height: 1; }
-  .bnav-label { font-family: var(--mono); font-size: 9px; letter-spacing: .5px; text-transform: uppercase; }
+  .bnav-item.active::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 15%; right: 15%;
+    height: 2px;
+    background: var(--accent);
+    border-radius: 0 0 3px 3px;
+  }
+  .bnav-icon { font-size: 24px; line-height: 1; }
+  .bnav-label { font-family: var(--mono); font-size: 9px; letter-spacing: .5px; text-transform: uppercase; font-weight: 600; }
 
   /* RESPONSIVE */
   @media (max-width: 768px) {
     .sidebar { display: none; }
-    .bottom-nav { display: flex; }
+    .bottom-nav { display: block; }
     .header-email { display: none; }
-    .content { padding: 14px; padding-bottom: calc(var(--bottom-h) + 16px + env(safe-area-inset-bottom, 0px)); }
+    .content {
+      padding: 14px;
+      padding-bottom: calc(var(--bottom-h) + 20px + env(safe-area-inset-bottom, 0px));
+    }
   }
 
   /* LOGIN */
@@ -169,21 +221,29 @@ const styles = `
   .page-sub { font-family: var(--mono); font-size: 11px; color: var(--text-dim); margin-top: 3px; }
 
   /* STATS */
-  .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 18px; }
+  @media (max-width: 600px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
   .stat-card { background: var(--surface); border: 1px solid var(--border); padding: 16px; position: relative; }
   .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--c, var(--accent)); }
   .stat-label { font-family: var(--mono); font-size: 9px; color: var(--text-dim); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; }
   .stat-value { font-family: var(--display); font-size: 38px; line-height: 1; }
   .stat-sub { font-family: var(--mono); font-size: 9px; color: var(--text-dim); margin-top: 4px; }
 
+  /* FILTRO TABS */
+  .filter-tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .ftab { background: transparent; border: 1px solid var(--border2); color: var(--text-dim); padding: 6px 12px; font-family: var(--mono); font-size: 10px; cursor: pointer; border-radius: var(--r); transition: all .15s; -webkit-tap-highlight-color: transparent; text-transform: uppercase; letter-spacing: 1px; display: flex; align-items: center; gap: 5px; }
+  .ftab:active, .ftab:hover { border-color: var(--accent); color: var(--accent); }
+  .ftab.active { background: var(--accent); color: #0a0a0a; border-color: var(--accent); font-weight: 600; }
+  .ftab-dot { width: 7px; height: 7px; border-radius: 50%; }
+
   /* TABLE CARD */
   .table-card { background: var(--surface); border: 1px solid var(--border); overflow: hidden; margin-bottom: 16px; }
   .table-card-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); gap: 10px; flex-wrap: wrap; }
   .table-card-title { font-family: var(--mono); font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: var(--text-mid); }
 
-  /* PRODUCT CARD LIST — usada no inventário e dashboard */
+  /* PRODUCT CARD LIST */
   .product-list { display: flex; flex-direction: column; }
-  .product-card { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border); transition: background .1s; }
+  .product-card { display: flex; align-items: center; gap: 12px; padding: 13px 16px; border-bottom: 1px solid var(--border); transition: background .1s; }
   .product-card:last-child { border-bottom: none; }
   .product-card:active { background: var(--surface2); }
   .product-card-info { flex: 1; min-width: 0; }
@@ -192,9 +252,15 @@ const styles = `
   .product-card-right { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; flex-shrink: 0; }
   .product-qty { font-family: var(--display); font-size: 28px; line-height: 1; }
 
+  /* STATUS BAR — mini barra colorida no produto */
+  .status-bar { display: flex; align-items: center; gap: 6px; }
+  .status-bar-track { width: 48px; height: 4px; background: var(--border2); border-radius: 2px; overflow: hidden; }
+  .status-bar-fill { height: 100%; border-radius: 2px; transition: width .3s; }
+
   /* BADGE */
   .badge { display: inline-block; padding: 2px 8px; font-size: 9px; letter-spacing: 1px; text-transform: uppercase; border: 1px solid; font-family: var(--mono); border-radius: var(--r); }
   .badge-ok   { color: var(--success); border-color: var(--success); background: rgba(74,222,128,.06); }
+  .badge-med  { color: var(--warn);    border-color: var(--warn);    background: rgba(250,204,21,.06); }
   .badge-low  { color: var(--accent);  border-color: var(--accent);  background: rgba(245,166,35,.06); }
   .badge-zero { color: var(--danger);  border-color: var(--danger);  background: rgba(248,113,113,.06); }
   .badge-in   { color: var(--success); border-color: var(--success); background: rgba(74,222,128,.06); }
@@ -205,6 +271,14 @@ const styles = `
   .card-title { font-family: var(--display); font-size: 18px; letter-spacing: 2px; color: var(--accent); margin-bottom: 16px; }
   .err-msg { background: rgba(248,113,113,.08); border: 1px solid var(--danger); color: var(--danger); padding: 10px 14px; font-family: var(--mono); font-size: 12px; margin-top: 12px; border-radius: var(--r); }
   .divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+  /* THRESHOLD SLIDER */
+  .thresh-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .thresh-row:last-child { border-bottom: none; }
+  .thresh-label { font-family: var(--mono); font-size: 11px; color: var(--text-dim); width: 70px; flex-shrink: 0; }
+  .thresh-slider { flex: 1; -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px; outline: none; cursor: pointer; }
+  .thresh-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; cursor: pointer; border: 2px solid var(--bg); }
+  .thresh-val { font-family: var(--display); font-size: 22px; width: 36px; text-align: right; flex-shrink: 0; }
 
   /* SCAN BTN */
   .btn-scan { background: var(--surface2); border: 1px dashed var(--border2); color: var(--text-dim); padding: 16px; font-family: var(--mono); font-size: 13px; cursor: pointer; transition: all .2s; width: 100%; display: flex; align-items: center; gap: 8px; justify-content: center; letter-spacing: 1px; border-radius: var(--r); touch-action: manipulation; -webkit-tap-highlight-color: transparent; min-height: 52px; }
@@ -277,7 +351,7 @@ const styles = `
   .tag button:hover { color: var(--danger); }
 
   /* TOAST */
-  .toast-wrap { position: fixed; bottom: calc(var(--bottom-h) + 8px); right: 12px; z-index: 9999; display: flex; flex-direction: column; gap: 6px; max-width: calc(100vw - 24px); }
+  .toast-wrap { position: fixed; bottom: calc(var(--bottom-h) + 10px); right: 12px; z-index: 9999; display: flex; flex-direction: column; gap: 6px; max-width: calc(100vw - 24px); }
   @media (min-width: 769px) { .toast-wrap { bottom: 20px; right: 20px; } }
   .toast { padding: 11px 16px; font-family: var(--mono); font-size: 12px; border-left: 3px solid; min-width: 220px; animation: tin .3s ease; border-radius: 0 var(--r) var(--r) 0; }
   .toast-success { background: rgba(20,30,20,.97); border-color: var(--success); color: var(--success); }
@@ -450,6 +524,35 @@ function Toast({ toasts }) {
 }
 
 // ============================================================
+// helpers de status/cor
+// ============================================================
+function statusColor(st) {
+  if (st === "zero")  return "var(--danger)";
+  if (st === "baixo") return "var(--accent)";
+  if (st === "medio") return "var(--warn)";
+  return "var(--success)";
+}
+function statusLabel(st) {
+  if (st === "zero")  return <span className="badge badge-zero">ZERADO</span>;
+  if (st === "baixo") return <span className="badge badge-low">BAIXO</span>;
+  if (st === "medio") return <span className="badge badge-med">MÉDIO</span>;
+  return <span className="badge badge-ok">OK</span>;
+}
+function StatusBar({ qtd, thresh }) {
+  const t = thresh || DEFAULT_THRESH;
+  const max = Math.max(t.medio * 2, qtd + 1);
+  const pct = Math.min(100, (qtd / max) * 100);
+  const st = getStatus(qtd, t);
+  return (
+    <div className="status-bar">
+      <div className="status-bar-track">
+        <div className="status-bar-fill" style={{ width: pct + "%", background: statusColor(st) }} />
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // LOGIN
 // ============================================================
 function LoginScreen({ onLogin }) {
@@ -495,57 +598,112 @@ function SetorScreen({ user, onSelect }) {
 }
 
 // ============================================================
-// DASHBOARD
+// DASHBOARD — todos os produtos + filtro de status
 // ============================================================
-function Dashboard({ setor, products }) {
+function Dashboard({ setor, products, thresh }) {
   const s = SETORES[setor];
-  const total = products.length;
+  const [filtro, setFiltro] = useState("todos");
+
+  const withStatus = products.map(p => ({ ...p, _st: getStatus(p.quantidade || 0, thresh) }));
+  const total      = products.length;
   const totalItens = products.reduce((a, p) => a + (p.quantidade || 0), 0);
-  const zerados = products.filter(p => (p.quantidade || 0) === 0).length;
-  const alertas = products.filter(p => (p.quantidade || 0) <= 5);
+  const zerados    = withStatus.filter(p => p._st === "zero").length;
+  const baixos     = withStatus.filter(p => p._st === "baixo").length;
+
+  const filtered = filtro === "todos" ? withStatus : withStatus.filter(p => p._st === filtro);
+
+  const filterBtns = [
+    { id: "todos",  label: "Todos",  dot: "#aaa",             count: total },
+    { id: "alto",   label: "OK",     dot: "var(--success)",   count: withStatus.filter(p=>p._st==="alto").length },
+    { id: "medio",  label: "Médio",  dot: "var(--warn)",      count: withStatus.filter(p=>p._st==="medio").length },
+    { id: "baixo",  label: "Baixo",  dot: "var(--accent)",    count: baixos },
+    { id: "zero",   label: "Zerado", dot: "var(--danger)",    count: zerados },
+  ];
+
   return (
     <div>
       <div className="page-hd"><div className="page-title">DASHBOARD</div><div className="page-sub">Setor {s.label}</div></div>
+
       <div className="stats-grid">
-        <div className="stat-card" style={{ "--c": s.color }}><div className="stat-label">Produtos</div><div className="stat-value" style={{ color: s.color }}>{total}</div><div className="stat-sub">SKUs</div></div>
-        <div className="stat-card" style={{ "--c": "var(--success)" }}><div className="stat-label">Em Estoque</div><div className="stat-value" style={{ color: "var(--success)" }}>{totalItens}</div><div className="stat-sub">unidades</div></div>
-        <div className="stat-card" style={{ "--c": zerados > 0 ? "var(--danger)" : "var(--success)" }}><div className="stat-label">Zerados</div><div className="stat-value" style={{ color: zerados > 0 ? "var(--danger)" : "var(--success)" }}>{zerados}</div><div className="stat-sub">produtos</div></div>
-      </div>
-      {alertas.length > 0 ? (
-        <div className="table-card">
-          <div className="table-card-header"><div className="table-card-title">⚠ Estoque Baixo / Zerado</div></div>
-          <div className="product-list">
-            {alertas.map(p => (
-              <div key={p.id} className="product-card">
-                <div className="product-card-info"><div className="product-card-name">{p.nome}</div><div className="product-card-cat">{p.categoria}</div></div>
-                <div className="product-card-right">
-                  <div className="product-qty" style={{ color: p.quantidade === 0 ? "var(--danger)" : "var(--accent)" }}>{p.quantidade}</div>
-                  {p.quantidade === 0 ? <span className="badge badge-zero">ZERADO</span> : <span className="badge badge-low">BAIXO</span>}
-                </div>
-              </div>
-            ))}
-          </div>
+        <div className="stat-card" style={{ "--c": s.color }}>
+          <div className="stat-label">Produtos</div>
+          <div className="stat-value" style={{ color: s.color }}>{total}</div>
+          <div className="stat-sub">SKUs</div>
         </div>
-      ) : <div style={{ fontFamily: "var(--mono)", fontSize: 12, color: "var(--success)", padding: "14px 0" }}>✓ Todos os produtos com estoque normal.</div>}
+        <div className="stat-card" style={{ "--c": "var(--success)" }}>
+          <div className="stat-label">Em Estoque</div>
+          <div className="stat-value" style={{ color: "var(--success)" }}>{totalItens}</div>
+          <div className="stat-sub">unidades</div>
+        </div>
+        <div className="stat-card" style={{ "--c": baixos > 0 ? "var(--accent)" : "var(--success)" }}>
+          <div className="stat-label">Baixo</div>
+          <div className="stat-value" style={{ color: baixos > 0 ? "var(--accent)" : "var(--success)" }}>{baixos}</div>
+          <div className="stat-sub">produtos</div>
+        </div>
+        <div className="stat-card" style={{ "--c": zerados > 0 ? "var(--danger)" : "var(--success)" }}>
+          <div className="stat-label">Zerados</div>
+          <div className="stat-value" style={{ color: zerados > 0 ? "var(--danger)" : "var(--success)" }}>{zerados}</div>
+          <div className="stat-sub">produtos</div>
+        </div>
+      </div>
+
+      {/* Filtros */}
+      <div className="filter-tabs">
+        {filterBtns.map(fb => (
+          <button key={fb.id} className={`ftab ${filtro === fb.id ? "active" : ""}`} onClick={() => setFiltro(fb.id)}>
+            {filtro !== fb.id && <span className="ftab-dot" style={{ background: fb.dot }} />}
+            {fb.label} {fb.count > 0 && <span style={{ opacity: .7 }}>({fb.count})</span>}
+          </button>
+        ))}
+      </div>
+
+      {/* Lista todos */}
+      <div className="table-card">
+        <div className="table-card-header">
+          <div className="table-card-title">{filtered.length} produto{filtered.length !== 1 ? "s" : ""}</div>
+        </div>
+        <div className="product-list">
+          {filtered.length === 0
+            ? <div className="empty">Nenhum produto nessa categoria.</div>
+            : filtered
+                .sort((a, b) => (a.quantidade || 0) - (b.quantidade || 0)) // zerados primeiro
+                .map(p => (
+                  <div key={p.id} className="product-card">
+                    <div className="product-card-info">
+                      <div className="product-card-name">{p.nome}</div>
+                      <div className="product-card-cat">{p.categoria}</div>
+                    </div>
+                    <div className="product-card-right">
+                      <div className="product-qty" style={{ color: statusColor(p._st) }}>{p.quantidade || 0}</div>
+                      <StatusBar qtd={p.quantidade || 0} thresh={thresh} />
+                      {statusLabel(p._st)}
+                    </div>
+                  </div>
+                ))
+          }
+        </div>
+      </div>
     </div>
   );
 }
 
 // ============================================================
-// CONFIGURAÇÕES
+// CONFIGURAÇÕES — categorias, produtos e THRESHOLDS
 // ============================================================
-function Configuracoes({ setor, user, addToast }) {
+function Configuracoes({ setor, user, addToast, thresh, onThreshChange }) {
   const colCat = getCol(setor, "categorias"), colPadrao = getCol(setor, "produtos_padrao");
   const [cats, setCats] = useState([]), [prods, setProds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [nomeCat, setNomeCat] = useState(""), [nomeProd, setNomeProd] = useState(""), [catProd, setCatProd] = useState("");
+  const [localThresh, setLocalThresh] = useState(thresh || DEFAULT_THRESH);
+  const [savingThresh, setSavingThresh] = useState(false);
 
   const load = async () => {
     setLoading(true);
     try { const [sc, sp] = await Promise.all([getDocs(collection(db, colCat)), getDocs(collection(db, colPadrao))]); setCats(sc.docs.map(d => ({ id: d.id, ...d.data() }))); setProds(sp.docs.map(d => ({ id: d.id, ...d.data() }))); }
     catch (e) { addToast("Erro: " + e.message, "error"); } finally { setLoading(false); }
   };
-  useEffect(() => { load(); }, [setor]);
+  useEffect(() => { load(); setLocalThresh(thresh || DEFAULT_THRESH); }, [setor, thresh]);
 
   const addCat = async () => {
     if (!nomeCat.trim()) return;
@@ -566,10 +724,80 @@ function Configuracoes({ setor, user, addToast }) {
     try { await deleteDoc(doc(db, colPadrao, p.id)); addToast("Removido.", "success"); load(); } catch (e) { addToast("Erro: " + e.message, "error"); }
   };
 
+  const saveThresh = async () => {
+    if (localThresh.baixo >= localThresh.medio) { addToast("'Baixo' deve ser menor que 'Médio'.", "error"); return; }
+    setSavingThresh(true);
+    try {
+      await setDoc(doc(db, getCol(setor, "config"), "thresholds"), { ...localThresh, updatedAt: new Date().toISOString() });
+      onThreshChange(localThresh);
+      await registrarLog(setor, "config", { descricao: `Thresholds: baixo≤${localThresh.baixo}, médio≤${localThresh.medio}`, usuario: user.email });
+      addToast("Limites salvos!", "success");
+    } catch (e) { addToast("Erro: " + e.message, "error"); } finally { setSavingThresh(false); }
+  };
+
   if (loading) return <div className="empty"><span className="spinner" /></div>;
+
   return (
     <div>
-      <div className="page-hd"><div className="page-title">CONFIG</div><div className="page-sub">Categorias e produtos — {SETORES[setor].label}</div></div>
+      <div className="page-hd"><div className="page-title">CONFIG</div><div className="page-sub">Configurações do setor {SETORES[setor].label}</div></div>
+
+      {/* THRESHOLDS */}
+      <div className="card">
+        <div className="card-title">NÍVEIS DE ESTOQUE</div>
+        <p style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--text-dim)", marginBottom: 20 }}>
+          Defina os limites para classificar o estoque como Baixo, Médio ou OK.
+        </p>
+
+        {/* Preview visual */}
+        <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 80, background: "var(--surface2)", border: "1px solid var(--danger)", borderRadius: "var(--r)", padding: "10px 14px", textAlign: "center" }}>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--danger)", letterSpacing: 2, marginBottom: 4 }}>ZERADO</div>
+            <div style={{ fontFamily: "var(--display)", fontSize: 22, color: "var(--danger)" }}>0</div>
+          </div>
+          <div style={{ flex: 1, minWidth: 80, background: "var(--surface2)", border: "1px solid var(--accent)", borderRadius: "var(--r)", padding: "10px 14px", textAlign: "center" }}>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--accent)", letterSpacing: 2, marginBottom: 4 }}>BAIXO</div>
+            <div style={{ fontFamily: "var(--display)", fontSize: 22, color: "var(--accent)" }}>1–{localThresh.baixo}</div>
+          </div>
+          <div style={{ flex: 1, minWidth: 80, background: "var(--surface2)", border: "1px solid var(--warn)", borderRadius: "var(--r)", padding: "10px 14px", textAlign: "center" }}>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--warn)", letterSpacing: 2, marginBottom: 4 }}>MÉDIO</div>
+            <div style={{ fontFamily: "var(--display)", fontSize: 22, color: "var(--warn)" }}>{localThresh.baixo + 1}–{localThresh.medio}</div>
+          </div>
+          <div style={{ flex: 1, minWidth: 80, background: "var(--surface2)", border: "1px solid var(--success)", borderRadius: "var(--r)", padding: "10px 14px", textAlign: "center" }}>
+            <div style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--success)", letterSpacing: 2, marginBottom: 4 }}>OK</div>
+            <div style={{ fontFamily: "var(--display)", fontSize: 22, color: "var(--success)" }}>{localThresh.medio + 1}+</div>
+          </div>
+        </div>
+
+        {/* Sliders */}
+        <div className="thresh-row">
+          <div className="thresh-label" style={{ color: "var(--accent)" }}>BAIXO ≤</div>
+          <input
+            type="range" min={1} max={50} value={localThresh.baixo}
+            onChange={e => setLocalThresh(p => ({ ...p, baixo: Math.min(Number(e.target.value), p.medio - 1) }))}
+            className="thresh-slider"
+            style={{ background: `linear-gradient(to right, var(--accent) 0%, var(--accent) ${(localThresh.baixo/50)*100}%, var(--border2) ${(localThresh.baixo/50)*100}%, var(--border2) 100%)` }}
+          />
+          <style>{`.thresh-slider::-webkit-slider-thumb { background: var(--accent); }`}</style>
+          <div className="thresh-val" style={{ color: "var(--accent)" }}>{localThresh.baixo}</div>
+        </div>
+        <div className="thresh-row">
+          <div className="thresh-label" style={{ color: "var(--warn)" }}>MÉDIO ≤</div>
+          <input
+            type="range" min={2} max={200} value={localThresh.medio}
+            onChange={e => setLocalThresh(p => ({ ...p, medio: Math.max(Number(e.target.value), p.baixo + 1) }))}
+            className="thresh-slider"
+            style={{ background: `linear-gradient(to right, var(--warn) 0%, var(--warn) ${(localThresh.medio/200)*100}%, var(--border2) ${(localThresh.medio/200)*100}%, var(--border2) 100%)` }}
+          />
+          <style>{`.thresh-slider:nth-of-type(2)::-webkit-slider-thumb { background: var(--warn); }`}</style>
+          <div className="thresh-val" style={{ color: "var(--warn)" }}>{localThresh.medio}</div>
+        </div>
+
+        <button className="btn btn-accent btn-full" style={{ marginTop: 16 }} onClick={saveThresh} disabled={savingThresh}>
+          {savingThresh ? <><span className="spinner" /> SALVANDO...</> : "💾 SALVAR LIMITES"}
+        </button>
+      </div>
+
+      {/* CATEGORIAS */}
       <div className="card">
         <div className="card-title">CATEGORIAS</div>
         <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
@@ -586,6 +814,8 @@ function Configuracoes({ setor, user, addToast }) {
             ))}
           </div>}
       </div>
+
+      {/* PRODUTOS PADRÃO */}
       <div className="card">
         <div className="card-title">PRODUTOS PADRÃO</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12 }}>
@@ -803,17 +1033,16 @@ function Saida({ setor, onRefresh, addToast, user }) {
 }
 
 // ============================================================
-// INVENTÁRIO — sem códigos visíveis, lista em card
+// INVENTÁRIO — sem códigos, lista limpa
 // ============================================================
-function Inventario({ setor, products, onDelete, addToast }) {
+function Inventario({ setor, products, onDelete, addToast, thresh }) {
   const colEst = getCol(setor, "produtos");
   const [search, setSearch] = useState(""), [loadId, setLoadId] = useState(null);
 
-  // Busca só por nome e categoria — sem códigos
   const filtered = products.filter(p =>
     (p.nome || "").toLowerCase().includes(search.toLowerCase()) ||
     (p.categoria || "").toLowerCase().includes(search.toLowerCase())
-  );
+  ).map(p => ({ ...p, _st: getStatus(p.quantidade || 0, thresh) }));
 
   const del = async (p) => {
     if (!confirm(`Excluir "${p.nome}"?`)) return;
@@ -833,15 +1062,16 @@ function Inventario({ setor, products, onDelete, addToast }) {
         <div className="product-list">
           {filtered.length === 0
             ? <div className="empty">Nenhum produto encontrado.</div>
-            : filtered.map(p => (
+            : filtered.sort((a, b) => (a.quantidade || 0) - (b.quantidade || 0)).map(p => (
               <div key={p.id} className="product-card">
                 <div className="product-card-info">
                   <div className="product-card-name">{p.nome}</div>
                   <div className="product-card-cat">{p.categoria}</div>
                 </div>
                 <div className="product-card-right">
-                  <div className="product-qty" style={{ color: p.quantidade === 0 ? "var(--danger)" : p.quantidade <= 5 ? "var(--accent)" : "var(--success)" }}>{p.quantidade}</div>
-                  {p.quantidade === 0 ? <span className="badge badge-zero">ZERADO</span> : p.quantidade <= 5 ? <span className="badge badge-low">BAIXO</span> : <span className="badge badge-ok">OK</span>}
+                  <div className="product-qty" style={{ color: statusColor(p._st) }}>{p.quantidade || 0}</div>
+                  <StatusBar qtd={p.quantidade || 0} thresh={thresh} />
+                  {statusLabel(p._st)}
                 </div>
                 <button className="btn-icon-sm" onClick={() => del(p)} disabled={loadId === p.id} style={{ marginLeft: 6 }}>
                   {loadId === p.id ? <span className="spinner" /> : "🗑"}
@@ -905,10 +1135,21 @@ export default function App() {
   const [user, setUser] = useState(null), [setor, setSetor] = useState(null);
   const [tab, setTab] = useState("dashboard"), [products, setProducts] = useState([]);
   const [toasts, setToasts] = useState([]), [loadingP, setLoadingP] = useState(false);
+  const [thresh, setThresh] = useState(DEFAULT_THRESH);
 
   const addToast = useCallback((message, type = "info") => {
     const id = Date.now(); setToasts(p => [...p, { id, message, type }]);
     setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 3500);
+  }, []);
+
+  // Carrega thresholds do Firebase ao trocar de setor
+  const loadThresh = useCallback(async (sk) => {
+    try {
+      const snap = await getDocs(collection(db, getCol(sk, "config")));
+      const t = snap.docs.find(d => d.id === "thresholds");
+      if (t) setThresh(t.data());
+      else setThresh(DEFAULT_THRESH);
+    } catch { setThresh(DEFAULT_THRESH); }
   }, []);
 
   const loadProducts = useCallback(async (sk) => {
@@ -917,10 +1158,10 @@ export default function App() {
     catch (e) { addToast("Erro: " + e.message, "error"); } finally { setLoadingP(false); }
   }, [setor, addToast]);
 
-  useEffect(() => { if (user && setor) loadProducts(setor); }, [user, setor]);
+  useEffect(() => { if (user && setor) { loadProducts(setor); loadThresh(setor); } }, [user, setor]);
 
   const logout = async () => { await signOut(auth); setUser(null); setSetor(null); setTab("dashboard"); setProducts([]); };
-  const selectSetor = (k) => { setSetor(k); setTab("dashboard"); setProducts([]); };
+  const selectSetor = (k) => { setSetor(k); setTab("dashboard"); setProducts([]); setThresh(DEFAULT_THRESH); };
   const back = () => { setSetor(null); setTab("dashboard"); setProducts([]); };
 
   if (!user) return <><style>{styles}</style><LoginScreen onLogin={setUser} /><Toast toasts={toasts} /></>;
@@ -938,12 +1179,12 @@ export default function App() {
 
   const s = SETORES[setor];
   const navItems = [
-    { id: "dashboard", icon: "▦", label: "Home" },
-    { id: "entrada",   icon: "↑", label: "Entrada" },
-    { id: "saida",     icon: "↓", label: "Saída" },
-    { id: "inventario",icon: "≡", label: "Estoque" },
-    { id: "log",       icon: "📋", label: "Log" },
-    { id: "config",    icon: "⚙", label: "Config" },
+    { id: "dashboard",  icon: "▦",  label: "Home"    },
+    { id: "entrada",    icon: "↑",  label: "Entrada" },
+    { id: "saida",      icon: "↓",  label: "Saída"   },
+    { id: "inventario", icon: "≡",  label: "Estoque" },
+    { id: "log",        icon: "📋", label: "Log"     },
+    { id: "config",     icon: "⚙",  label: "Config"  },
   ];
   const navGroups = [
     { group: "GERAL",     items: [navItems[0]] },
@@ -988,16 +1229,17 @@ export default function App() {
           {loadingP
             ? <div className="empty"><span className="spinner" style={{ width: 28, height: 28, borderWidth: 3 }} /></div>
             : <>
-              {tab === "dashboard"  && <Dashboard setor={setor} products={products} />}
-              {tab === "entrada"    && <Entrada setor={setor} onRefresh={() => loadProducts(setor)} addToast={addToast} user={user} />}
-              {tab === "saida"      && <Saida setor={setor} onRefresh={() => loadProducts(setor)} addToast={addToast} user={user} />}
-              {tab === "inventario" && <Inventario setor={setor} products={products} onDelete={() => loadProducts(setor)} addToast={addToast} />}
+              {tab === "dashboard"  && <Dashboard  setor={setor} products={products} thresh={thresh} />}
+              {tab === "entrada"    && <Entrada    setor={setor} onRefresh={() => loadProducts(setor)} addToast={addToast} user={user} />}
+              {tab === "saida"      && <Saida      setor={setor} onRefresh={() => loadProducts(setor)} addToast={addToast} user={user} />}
+              {tab === "inventario" && <Inventario setor={setor} products={products} onDelete={() => loadProducts(setor)} addToast={addToast} thresh={thresh} />}
               {tab === "log"        && <LogCompleto setor={setor} addToast={addToast} />}
-              {tab === "config"     && <Configuracoes setor={setor} user={user} addToast={addToast} />}
+              {tab === "config"     && <Configuracoes setor={setor} user={user} addToast={addToast} thresh={thresh} onThreshChange={t => setThresh(t)} />}
             </>}
         </main>
       </div>
-      {/* Bottom nav mobile */}
+
+      {/* Bottom nav mobile — FORA do main-layout para ficar fixo */}
       <nav className="bottom-nav">
         <div className="bottom-nav-inner">
           {navItems.map(item => (
