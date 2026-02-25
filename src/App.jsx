@@ -67,7 +67,7 @@ const Icon = ({ name, size = 18, color = "currentColor", style = {} }) => {
 // ============================================================
 const SETORES = {
   ti:           { label:"TI",              iconName:"monitor",     color:"#3b82f6", col:"estoque_ti"           },
-  exfood:       { label:"Exfood",          iconName:"utensils",    color:"#f5a623", col:"estoque_exfood"       },
+  exfood:       { label:"X-food",          iconName:"utensils",    color:"#f5a623", col:"estoque_exfood"       },
   limpeza:      { label:"Limpeza",         iconName:"sparkles",    color:"#52c41a", col:"estoque_limpeza"      },
   ferramentas:  { label:"Ferramentas",     iconName:"tools",       color:"#a855f7", col:"estoque_ferramentas"  },
 };
