@@ -844,6 +844,108 @@ function SearchBox({ ctx, value, onChange, placeholder = "Buscar...", suggestion
 }
 
 // ============================================================
+// SELECT SEARCH — dropdown com busca para selecionar um valor
+// ============================================================
+function SelectSearch({ value, onChange, options, placeholder = "Selecionar...", label, emptyLabel = "Todas", allowEmpty = false }) {
+  const [open, setOpen]   = useState(false);
+  const [query, setQuery] = useState("");
+  const wrapRef           = useRef(null);
+  const inputRef          = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const filtered = options.filter(o => !query || o.toLowerCase().includes(query.toLowerCase()));
+
+  const pick = (val) => {
+    onChange(val);
+    setQuery("");
+    setOpen(false);
+  };
+
+  const displayValue = value || "";
+
+  return (
+    <div ref={wrapRef} style={{ position:"relative" }}>
+      {label && <label className="form-label">{label}</label>}
+      <div
+        onClick={() => { setOpen(o => !o); setTimeout(() => inputRef.current?.focus(), 50); }}
+        style={{
+          display:"flex", alignItems:"center", gap:8,
+          background:"var(--surface2)", border:`1px solid ${open ? "var(--accent)" : "var(--border2)"}`,
+          borderRadius:"var(--r)", padding:"12px 14px", cursor:"pointer",
+          transition:"border-color .2s", minHeight:48,
+        }}
+      >
+        <Icon name="search" size={14} color="var(--text-dim)" />
+        <span style={{ flex:1, fontFamily:"var(--mono)", fontSize:14, color: displayValue ? "var(--text)" : "var(--text-dim)" }}>
+          {displayValue || placeholder}
+        </span>
+        {displayValue && (
+          <button
+            onClick={e => { e.stopPropagation(); pick(""); }}
+            style={{ background:"transparent", border:"none", color:"var(--text-dim)", cursor:"pointer", display:"flex", alignItems:"center", padding:2 }}
+          >
+            <Icon name="x" size={13} />
+          </button>
+        )}
+        <Icon name="chevronRight" size={13} color="var(--text-dim)" style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)", transition:"transform .2s" }} />
+      </div>
+
+      {open && (
+        <div style={{ position:"absolute", top:"calc(100% + 4px)", left:0, right:0, background:"var(--surface)", border:"1px solid var(--border2)", borderRadius:"var(--r)", zIndex:600, boxShadow:"0 8px 24px rgba(0,0,0,.6)", overflow:"hidden" }}>
+          {/* Campo de busca dentro do dropdown */}
+          <div style={{ padding:8, borderBottom:"1px solid var(--border)", display:"flex", alignItems:"center", gap:6, background:"var(--surface2)" }}>
+            <Icon name="search" size={13} color="var(--accent)" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Buscar..."
+              style={{ flex:1, background:"transparent", border:"none", outline:"none", color:"var(--text)", fontFamily:"var(--mono)", fontSize:13, padding:"2px 0" }}
+              onKeyDown={e => { if (e.key === "Escape") setOpen(false); }}
+            />
+            {query && <button onClick={() => setQuery("")} style={{ background:"transparent", border:"none", color:"var(--text-dim)", cursor:"pointer", display:"flex" }}><Icon name="x" size={12} /></button>}
+          </div>
+          <div style={{ maxHeight:220, overflowY:"auto" }}>
+            {allowEmpty && (
+              <div
+                onClick={() => pick("")}
+                style={{ padding:"10px 14px", cursor:"pointer", fontFamily:"var(--mono)", fontSize:12, color:"var(--text-dim)", borderBottom:"1px solid var(--border)", background: value === "" ? "rgba(245,166,35,.08)" : "transparent" }}
+                onMouseEnter={e => e.currentTarget.style.background="var(--surface2)"}
+                onMouseLeave={e => e.currentTarget.style.background = value === "" ? "rgba(245,166,35,.08)" : "transparent"}
+              >
+                {emptyLabel}
+              </div>
+            )}
+            {filtered.length === 0
+              ? <div style={{ padding:"12px 14px", fontFamily:"var(--mono)", fontSize:12, color:"var(--text-dim)" }}>Nenhum resultado</div>
+              : filtered.map(o => (
+                <div
+                  key={o}
+                  onClick={() => pick(o)}
+                  style={{ padding:"10px 14px", cursor:"pointer", fontFamily:"var(--mono)", fontSize:12, color: value === o ? "var(--accent)" : "var(--text)", borderBottom:"1px solid var(--border)", background: value === o ? "rgba(245,166,35,.08)" : "transparent", display:"flex", alignItems:"center", gap:8 }}
+                  onMouseEnter={e => { if (value !== o) e.currentTarget.style.background = "var(--surface2)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = value === o ? "rgba(245,166,35,.08)" : "transparent"; }}
+                >
+                  {value === o && <Icon name="check" size={13} color="var(--accent)" />}
+                  {value !== o && <span style={{ width:13 }} />}
+                  {o}
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
 // LOGIN
 // ============================================================
 function LoginScreen({ onLogin }) {
@@ -1588,18 +1690,24 @@ function Entrada({ setor, onRefresh, addToast, user }) {
         <div className="card-title">REGISTRAR ENTRADA</div>
         <div className="form-row" style={{ marginBottom:14 }}>
           <div className="form-group" style={{ margin:0 }}>
-            <label className="form-label">Categoria</label>
-            <select className="form-select" value={catSel} onChange={e => { setCatSel(e.target.value); setProdSel(""); }}>
-              <option value="">Todas</option>
-              {cats.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
-            </select>
+            <SelectSearch
+              label="Categoria"
+              value={catSel}
+              onChange={v => { setCatSel(v); setProdSel(""); }}
+              options={cats.map(c => c.nome)}
+              placeholder="Todas"
+              emptyLabel="Todas as categorias"
+              allowEmpty
+            />
           </div>
           <div className="form-group" style={{ margin:0 }}>
-            <label className="form-label">Produto *</label>
-            <select className="form-select" value={prodSel} onChange={e => setProdSel(e.target.value)}>
-              <option value="">Selecionar...</option>
-              {prodsFiltrados.map(p => <option key={p.id} value={p.nome}>{p.nome}</option>)}
-            </select>
+            <SelectSearch
+              label="Produto *"
+              value={prodSel}
+              onChange={setProdSel}
+              options={prodsFiltrados.map(p => p.nome)}
+              placeholder="Buscar produto..."
+            />
           </div>
         </div>
         <div className="form-group" style={{ maxWidth:160 }}>
