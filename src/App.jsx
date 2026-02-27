@@ -1664,7 +1664,7 @@ function PedidosConfirmar({ setor, addToast }) {
   );
 }
 
-// ─── APP ─────────────────────────────────────────────────────
+// ─── APP ─────────────────────────────────────────────────
 export default function App() {
   const [user,setUser]=useState(null), [setor,setSetor]=useState(null), [showFerrSub,setShowFerrSub]=useState(false);
   const [tab,setTab]=useState("dashboard"), [products,setProducts]=useState([]), [toasts,setToasts]=useState([]);
