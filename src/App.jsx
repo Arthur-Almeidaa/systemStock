@@ -54,6 +54,7 @@ const Icon = ({ name, size = 18, color = "currentColor", style = {} }) => {
     maintenance: <><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></>,
     grid: <><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></>,
     chevronRight: <><polyline points="9 18 15 12 9 6"/></>,
+    clipboard: <><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display:"inline-block", flexShrink:0, ...style }}>
@@ -79,6 +80,10 @@ const FERRAMENTAS_SUB = {
 };
 
 const IS_FERR_SUB = (k) => k === "fti" || k === "fmanutencao";
+
+// Usuário exclusivo de pedidos (sem acesso ao estoque)
+const PEDIDOS_EMAIL = "pedidos@gmail.com";
+const isPedidosUser = (user) => user?.email?.toLowerCase() === PEDIDOS_EMAIL;
 
 // Resolve o setor real (pode ser sub-setor de ferramentas)
 const resolveSetor = (setor) => {
@@ -475,6 +480,79 @@ const styles = `
   /* Inline edit */
   .inline-edit-row { display:flex; align-items:center; gap:6px; }
   .inline-edit-row input { flex:1; background:var(--surface2); border:1px solid var(--accent); color:var(--text); padding:7px 10px; font-family:var(--mono); font-size:13px; outline:none; border-radius:var(--r); }
+
+  /* PEDIDOS */
+  .pedido-cat-header { display:flex; align-items:center; gap:10px; padding:10px 16px 6px; border-bottom:1px solid var(--border); background:var(--surface2); position:sticky; top:0; z-index:10; }
+  .pedido-cat-label { font-family:var(--mono); font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--text-dim); flex:1; }
+  .pedido-item { display:flex; align-items:center; gap:12px; padding:11px 16px; border-bottom:1px solid var(--border); transition:background .1s; }
+  .pedido-item:last-child { border-bottom:none; }
+  .pedido-item:hover { background:rgba(255,255,255,.02); }
+  .pedido-item-info { flex:1; min-width:0; }
+  .pedido-item-name { font-family:var(--sans); font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pedido-item-estoque { font-family:var(--mono); font-size:10px; color:var(--text-dim); margin-top:2px; }
+  .pedido-qty-ctrl { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+  .pedido-qty-btn { width:32px; height:32px; border-radius:50%; border:1px solid var(--border2); background:var(--surface2); color:var(--text); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:16px; font-family:var(--mono); transition:all .15s; -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
+  .pedido-qty-btn:hover, .pedido-qty-btn:active { border-color:var(--accent); color:var(--accent); background:rgba(245,166,35,.08); }
+  .pedido-qty-val { font-family:var(--display); font-size:22px; min-width:36px; text-align:center; color:var(--accent); }
+  .pedido-qty-val.zero { color:var(--text-dim); }
+  .pedido-summary-bar { position:sticky; bottom:0; background:var(--surface); border-top:2px solid var(--border2); padding:12px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap; z-index:20; }
+  .pedido-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:3000; display:flex; align-items:flex-end; justify-content:center; }
+  @media (min-width:600px) { .pedido-modal-overlay { align-items:center; } }
+  .pedido-modal { background:var(--surface); border:1px solid var(--border2); border-radius:var(--r) var(--r) 0 0; width:100%; max-width:560px; max-height:90vh; display:flex; flex-direction:column; overflow:hidden; }
+  @media (min-width:600px) { .pedido-modal { border-radius:var(--r); } }
+  .pedido-modal-header { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--border); flex-shrink:0; }
+  .pedido-modal-title { font-family:var(--display); font-size:22px; letter-spacing:3px; color:var(--accent); }
+  .pedido-modal-body { flex:1; overflow-y:auto; padding:0; }
+  .pedido-modal-footer { padding:14px 20px; border-top:1px solid var(--border); display:flex; gap:8px; flex-shrink:0; }
+  .pedido-print-item { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); }
+  .pedido-print-item:last-child { border-bottom:none; }
+  .pedido-print-cat { font-family:var(--mono); font-size:9px; color:var(--text-dim); letter-spacing:2px; text-transform:uppercase; padding:10px 0 4px; }
+  .pedido-tag-added { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; background:rgba(74,222,128,.1); border:1px solid var(--success); border-radius:var(--r); font-family:var(--mono); font-size:9px; color:var(--success); letter-spacing:1px; }
+
+  /* PEDIDOS SCREEN (usuário exclusivo de pedidos) */
+  .ps-wrap { min-height:100vh; min-height:100dvh; display:flex; flex-direction:column; background:var(--bg); }
+  .ps-header { background:var(--surface); border-bottom:1px solid var(--border); height:var(--header-h); display:flex; align-items:center; justify-content:space-between; padding:0 16px; position:sticky; top:0; z-index:200; flex-shrink:0; }
+  .ps-content { flex:1; padding:24px 20px; max-width:700px; margin:0 auto; width:100%; }
+  @media (max-width:768px) { .ps-content { padding:14px; padding-bottom:30px; } }
+
+  /* PEDIDOS CONFIRMAR (aba para admins) */
+  .pedconf-card { background:var(--surface); border:1px solid var(--border); margin-bottom:12px; overflow:hidden; }
+  .pedconf-header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--border); gap:8px; flex-wrap:wrap; }
+  .pedconf-title { font-family:var(--display); font-size:18px; letter-spacing:2px; color:var(--accent); }
+  .pedconf-meta { font-family:var(--mono); font-size:10px; color:var(--text-dim); }
+  .pedconf-item { display:flex; align-items:center; justify-content:space-between; padding:9px 16px; border-bottom:1px solid var(--border); }
+  .pedconf-item:last-child { border-bottom:none; }
+  .pedconf-item-name { font-family:var(--sans); font-size:13px; font-weight:600; }
+  .pedconf-item-cat { font-family:var(--mono); font-size:10px; color:var(--text-dim); }
+  .pedconf-item-qty { font-family:var(--display); font-size:26px; color:var(--accent); }
+  .pedconf-footer { padding:12px 16px; display:flex; gap:8px; background:var(--surface2); }
+  .pedconf-badge-pend { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; background:rgba(250,204,21,.1); border:1px solid var(--warn); border-radius:var(--r); font-family:var(--mono); font-size:9px; color:var(--warn); letter-spacing:1px; }
+  .pedconf-badge-done { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; background:rgba(74,222,128,.1); border:1px solid var(--success); border-radius:var(--r); font-family:var(--mono); font-size:9px; color:var(--success); letter-spacing:1px; }
+
+
+  /* TELA PEDIDOS USER */
+  .pedidos-screen { flex:1; display:flex; flex-direction:column; align-items:center; padding:24px 16px 40px; gap:0; max-width:700px; margin:0 auto; width:100%; }
+  .pedidos-screen-header { width:100%; display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:8px; }
+  .pedidos-setor-sel { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; width:100%; margin-bottom:20px; }
+  @media (max-width:500px) { .pedidos-setor-sel { grid-template-columns:repeat(2,1fr); } }
+  .pedidos-setor-btn { background:var(--surface); border:1px solid var(--border); padding:18px 10px; cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:8px; transition:all .2s; border-radius:var(--r); -webkit-tap-highlight-color:transparent; }
+  .pedidos-setor-btn:hover, .pedidos-setor-btn:active { border-color:var(--c,var(--accent)); transform:translateY(-2px); }
+  .pedidos-setor-btn.sel { border-color:var(--c,var(--accent)); background:rgba(255,255,255,.04); }
+  .pedidos-setor-btn-name { font-family:var(--display); font-size:16px; letter-spacing:2px; color:var(--c,var(--accent)); }
+
+  /* PEDIDOS PENDENTES (para user de estoque) */
+  .pendente-card { background:var(--surface); border:1px solid var(--border2); border-radius:var(--r); margin-bottom:12px; overflow:hidden; }
+  .pendente-card-header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--border); background:var(--surface2); flex-wrap:wrap; gap:6px; }
+  .pendente-card-title { font-family:var(--mono); font-size:10px; color:var(--text-dim); letter-spacing:1px; }
+  .pendente-card-meta { font-family:var(--mono); font-size:11px; color:var(--accent); font-weight:600; }
+  .pendente-item-row { display:flex; align-items:center; justify-content:space-between; padding:9px 16px; border-bottom:1px solid var(--border); }
+  .pendente-item-row:last-child { border-bottom:none; }
+  .pendente-item-name { font-family:var(--sans); font-size:13px; font-weight:600; }
+  .pendente-item-cat { font-family:var(--mono); font-size:10px; color:var(--text-dim); }
+  .pendente-item-qty { font-family:var(--display); font-size:26px; color:var(--accent); }
+  .pendente-empty { text-align:center; padding:48px 20px; font-family:var(--mono); font-size:12px; color:var(--text-dim); }
+  .pendente-badge-novo { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; background:rgba(245,166,35,.12); border:1px solid var(--accent); border-radius:var(--r); font-family:var(--mono); font-size:9px; color:var(--accent); letter-spacing:1px; }
+  .pendente-badge-ok { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; background:rgba(74,222,128,.1); border:1px solid var(--success); border-radius:var(--r); font-family:var(--mono); font-size:9px; color:var(--success); letter-spacing:1px; }
 `;
 
 // ============================================================
@@ -837,108 +915,6 @@ function SearchBox({ ctx, value, onChange, placeholder = "Buscar...", suggestion
               ))}
             </>
           )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ============================================================
-// SELECT SEARCH — dropdown com busca para selecionar um valor
-// ============================================================
-function SelectSearch({ value, onChange, options, placeholder = "Selecionar...", label, emptyLabel = "Todas", allowEmpty = false }) {
-  const [open, setOpen]   = useState(false);
-  const [query, setQuery] = useState("");
-  const wrapRef           = useRef(null);
-  const inputRef          = useRef(null);
-
-  useEffect(() => {
-    const handler = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const filtered = options.filter(o => !query || o.toLowerCase().includes(query.toLowerCase()));
-
-  const pick = (val) => {
-    onChange(val);
-    setQuery("");
-    setOpen(false);
-  };
-
-  const displayValue = value || "";
-
-  return (
-    <div ref={wrapRef} style={{ position:"relative" }}>
-      {label && <label className="form-label">{label}</label>}
-      <div
-        onClick={() => { setOpen(o => !o); setTimeout(() => inputRef.current?.focus(), 50); }}
-        style={{
-          display:"flex", alignItems:"center", gap:8,
-          background:"var(--surface2)", border:`1px solid ${open ? "var(--accent)" : "var(--border2)"}`,
-          borderRadius:"var(--r)", padding:"12px 14px", cursor:"pointer",
-          transition:"border-color .2s", minHeight:48,
-        }}
-      >
-        <Icon name="search" size={14} color="var(--text-dim)" />
-        <span style={{ flex:1, fontFamily:"var(--mono)", fontSize:14, color: displayValue ? "var(--text)" : "var(--text-dim)" }}>
-          {displayValue || placeholder}
-        </span>
-        {displayValue && (
-          <button
-            onClick={e => { e.stopPropagation(); pick(""); }}
-            style={{ background:"transparent", border:"none", color:"var(--text-dim)", cursor:"pointer", display:"flex", alignItems:"center", padding:2 }}
-          >
-            <Icon name="x" size={13} />
-          </button>
-        )}
-        <Icon name="chevronRight" size={13} color="var(--text-dim)" style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)", transition:"transform .2s" }} />
-      </div>
-
-      {open && (
-        <div style={{ position:"absolute", top:"calc(100% + 4px)", left:0, right:0, background:"var(--surface)", border:"1px solid var(--border2)", borderRadius:"var(--r)", zIndex:600, boxShadow:"0 8px 24px rgba(0,0,0,.6)", overflow:"hidden" }}>
-          {/* Campo de busca dentro do dropdown */}
-          <div style={{ padding:8, borderBottom:"1px solid var(--border)", display:"flex", alignItems:"center", gap:6, background:"var(--surface2)" }}>
-            <Icon name="search" size={13} color="var(--accent)" />
-            <input
-              ref={inputRef}
-              type="text"
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="Buscar..."
-              style={{ flex:1, background:"transparent", border:"none", outline:"none", color:"var(--text)", fontFamily:"var(--mono)", fontSize:13, padding:"2px 0" }}
-              onKeyDown={e => { if (e.key === "Escape") setOpen(false); }}
-            />
-            {query && <button onClick={() => setQuery("")} style={{ background:"transparent", border:"none", color:"var(--text-dim)", cursor:"pointer", display:"flex" }}><Icon name="x" size={12} /></button>}
-          </div>
-          <div style={{ maxHeight:220, overflowY:"auto" }}>
-            {allowEmpty && (
-              <div
-                onClick={() => pick("")}
-                style={{ padding:"10px 14px", cursor:"pointer", fontFamily:"var(--mono)", fontSize:12, color:"var(--text-dim)", borderBottom:"1px solid var(--border)", background: value === "" ? "rgba(245,166,35,.08)" : "transparent" }}
-                onMouseEnter={e => e.currentTarget.style.background="var(--surface2)"}
-                onMouseLeave={e => e.currentTarget.style.background = value === "" ? "rgba(245,166,35,.08)" : "transparent"}
-              >
-                {emptyLabel}
-              </div>
-            )}
-            {filtered.length === 0
-              ? <div style={{ padding:"12px 14px", fontFamily:"var(--mono)", fontSize:12, color:"var(--text-dim)" }}>Nenhum resultado</div>
-              : filtered.map(o => (
-                <div
-                  key={o}
-                  onClick={() => pick(o)}
-                  style={{ padding:"10px 14px", cursor:"pointer", fontFamily:"var(--mono)", fontSize:12, color: value === o ? "var(--accent)" : "var(--text)", borderBottom:"1px solid var(--border)", background: value === o ? "rgba(245,166,35,.08)" : "transparent", display:"flex", alignItems:"center", gap:8 }}
-                  onMouseEnter={e => { if (value !== o) e.currentTarget.style.background = "var(--surface2)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = value === o ? "rgba(245,166,35,.08)" : "transparent"; }}
-                >
-                  {value === o && <Icon name="check" size={13} color="var(--accent)" />}
-                  {value !== o && <span style={{ width:13 }} />}
-                  {o}
-                </div>
-              ))
-            }
-          </div>
         </div>
       )}
     </div>
@@ -1690,24 +1666,18 @@ function Entrada({ setor, onRefresh, addToast, user }) {
         <div className="card-title">REGISTRAR ENTRADA</div>
         <div className="form-row" style={{ marginBottom:14 }}>
           <div className="form-group" style={{ margin:0 }}>
-            <SelectSearch
-              label="Categoria"
-              value={catSel}
-              onChange={v => { setCatSel(v); setProdSel(""); }}
-              options={cats.map(c => c.nome)}
-              placeholder="Todas"
-              emptyLabel="Todas as categorias"
-              allowEmpty
-            />
+            <label className="form-label">Categoria</label>
+            <select className="form-select" value={catSel} onChange={e => { setCatSel(e.target.value); setProdSel(""); }}>
+              <option value="">Todas</option>
+              {cats.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}
+            </select>
           </div>
           <div className="form-group" style={{ margin:0 }}>
-            <SelectSearch
-              label="Produto *"
-              value={prodSel}
-              onChange={setProdSel}
-              options={prodsFiltrados.map(p => p.nome)}
-              placeholder="Buscar produto..."
-            />
+            <label className="form-label">Produto *</label>
+            <select className="form-select" value={prodSel} onChange={e => setProdSel(e.target.value)}>
+              <option value="">Selecionar...</option>
+              {prodsFiltrados.map(p => <option key={p.id} value={p.nome}>{p.nome}</option>)}
+            </select>
           </div>
         </div>
         <div className="form-group" style={{ maxWidth:160 }}>
@@ -2309,8 +2279,506 @@ function Analytics({ setor, products }) {
 }
 
 // ============================================================
-// APP
+// PEDIDOS — lógica de fazer pedido (usada em 2 contextos)
 // ============================================================
+
+// Hook reutilizável com toda a lógica de montar um pedido a partir do estoque de um setor
+function usePedidoSetor(setor, addToast) {
+  const colPedidos = "pedidos_globais"; // coleção única de pedidos, cruzando setores
+  const colEst     = getCol(setor, "produtos");
+
+  const [produtos, setProdutos]   = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [qtds, setQtds]           = useState({});
+  const [salvando, setSalvando]   = useState(false);
+  const [copiado, setCopiado]     = useState(false);
+
+  useEffect(() => {
+    setQtds({});
+    (async () => {
+      setLoading(true);
+      try {
+        const snap = await getDocs(collection(db, colEst));
+        setProdutos(snap.docs.map(d => ({ id:d.id, ...d.data() })));
+      } catch(e) { addToast("Erro: " + e.message, "error"); }
+      finally { setLoading(false); }
+    })();
+  }, [setor]);
+
+  const inc = (id) => setQtds(p => ({ ...p, [id]: (p[id]||0) + 1 }));
+  const dec = (id) => setQtds(p => ({ ...p, [id]: Math.max(0, (p[id]||0) - 1) }));
+  const setQtdManual = (id, val) => setQtds(p => ({ ...p, [id]: Math.max(0, parseInt(val)||0) }));
+  const limpar = () => setQtds({});
+
+  const itensSelecionados = produtos.filter(p => (qtds[p.id]||0) > 0);
+  const totalItens = itensSelecionados.length;
+  const totalQtd   = itensSelecionados.reduce((s,p) => s + (qtds[p.id]||0), 0);
+
+  const gerarTexto = () => {
+    const s = resolveSetor(setor);
+    const linhas = [`📋 PEDIDO — ${s.label.toUpperCase()}`, `Data: ${new Date().toLocaleDateString("pt-BR")}`, ""];
+    const porCat = {};
+    itensSelecionados.forEach(p => {
+      const cat = p.categoria||"Sem categoria";
+      if (!porCat[cat]) porCat[cat] = [];
+      porCat[cat].push(p);
+    });
+    Object.entries(porCat).forEach(([cat, prods]) => {
+      linhas.push(`[${cat.toUpperCase()}]`);
+      prods.forEach(p => linhas.push(`  • ${p.nome}: ${qtds[p.id]} un.`));
+      linhas.push("");
+    });
+    linhas.push(`Total: ${totalQtd} unidades (${totalItens} produtos)`);
+    return linhas.join("\n");
+  };
+
+  const copiar = async () => {
+    try { await navigator.clipboard.writeText(gerarTexto()); setCopiado(true); setTimeout(() => setCopiado(false), 2000); }
+    catch { addToast("Erro ao copiar.", "error"); }
+  };
+
+  const salvar = async (userEmail) => {
+    if (!itensSelecionados.length) return false;
+    setSalvando(true);
+    try {
+      const itens = itensSelecionados.map(p => ({ nome:p.nome, categoria:p.categoria||"", quantidade:qtds[p.id] }));
+      await addDoc(collection(db, colPedidos), {
+        itens, totalItens, totalQtd,
+        setor: resolveSetor(setor).label,
+        setorKey: setor,
+        criadoPor: userEmail,
+        status: "pendente",
+        criadoEm: serverTimestamp(),
+      });
+      addToast("Pedido enviado!", "success");
+      limpar();
+      return true;
+    } catch(e) { addToast("Erro: " + e.message, "error"); return false; }
+    finally { setSalvando(false); }
+  };
+
+  return { produtos, loading, qtds, inc, dec, setQtdManual, limpar, itensSelecionados, totalItens, totalQtd, gerarTexto, copiar, copiado, salvar, salvando };
+}
+
+// ============================================================
+// MONTAR PEDIDO — UI compartilhada (usada na PedidosScreen e na aba Pedidos dos admins)
+// ============================================================
+function MontarPedido({ setor, userEmail, addToast, onSaved }) {
+  const { produtos, loading, qtds, inc, dec, setQtdManual, limpar, itensSelecionados, totalItens, totalQtd, copiar, copiado, salvar, salvando } = usePedidoSetor(setor, addToast);
+  const [showModal, setShowModal] = useState(false);
+  const [search, setSearch]       = useState("");
+  const [catFiltro, setCatFiltro] = useState("todas");
+
+  const cats = [...new Set(produtos.map(p => p.categoria).filter(Boolean))].sort();
+  const q = search.toLowerCase();
+  const filtrados = produtos.filter(p => {
+    const passaCat  = catFiltro === "todas" || p.categoria === catFiltro;
+    const passaBusc = !q || (p.nome||"").toLowerCase().includes(q) || (p.categoria||"").toLowerCase().includes(q);
+    return passaCat && passaBusc;
+  });
+  const catsVisiveis = catFiltro === "todas" ? cats : cats.filter(c => c === catFiltro);
+
+  const handleSalvar = async () => {
+    const ok = await salvar(userEmail);
+    if (ok) { setShowModal(false); onSaved?.(); }
+  };
+
+  if (loading) return <div className="empty"><span className="spinner" /></div>;
+
+  if (!produtos.length) return (
+    <div className="err-msg">Nenhum produto cadastrado no estoque do setor {resolveSetor(setor).label}.</div>
+  );
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column" }}>
+      <SearchBox
+        ctx={`mpedido_${setor}`}
+        value={search}
+        onChange={setSearch}
+        placeholder="Buscar produto ou categoria..."
+        suggestions={[...new Set([...produtos.map(p=>p.nome), ...cats])].filter(Boolean)}
+        style={{ marginBottom:10 }}
+      />
+      <div className="filter-tabs" style={{ marginBottom:14 }}>
+        <button className={`ftab ${catFiltro==="todas"?"active":""}`} onClick={() => setCatFiltro("todas")}>
+          Todas <span style={{ opacity:.7 }}>({produtos.length})</span>
+        </button>
+        {cats.map(c => (
+          <button key={c} className={`ftab ${catFiltro===c?"active":""}`} onClick={() => setCatFiltro(c)}>
+            {c} <span style={{ opacity:.7 }}>({produtos.filter(p=>p.categoria===c).length})</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="table-card" style={{ marginBottom: totalItens > 0 ? 90 : 16 }}>
+        {filtrados.length === 0
+          ? <div className="empty">Nenhum produto encontrado.</div>
+          : <>
+              {catsVisiveis.map(cat => {
+                const prods = filtrados.filter(p => (p.categoria||"Sem categoria") === cat).sort((a,b) => (a.nome||"").localeCompare(b.nome||""));
+                if (!prods.length) return null;
+                return (
+                  <div key={cat}>
+                    <div className="pedido-cat-header">
+                      <span className="pedido-cat-label">{cat}</span>
+                      <span style={{ fontFamily:"var(--mono)", fontSize:10, color:"var(--text-dim)" }}>{prods.length} item{prods.length!==1?"s":""}</span>
+                    </div>
+                    {prods.map(p => {
+                      const qty  = qtds[p.id]||0;
+                      const estq = p.quantidade||0;
+                      return (
+                        <div key={p.id} className="pedido-item" style={{ background: qty > 0 ? "rgba(245,166,35,.04)" : undefined }}>
+                          <div className="pedido-item-info">
+                            <div className="pedido-item-name">{p.nome}</div>
+                            <div className="pedido-item-estoque">
+                              <span style={{ color: estq===0?"var(--danger)":estq<=5?"var(--accent)":"var(--text-dim)" }}>
+                                Estoque: {estq} un.
+                              </span>
+                            </div>
+                          </div>
+                          <div className="pedido-qty-ctrl">
+                            <button className="pedido-qty-btn" onClick={() => dec(p.id)}>−</button>
+                            <input
+                              type="number" inputMode="numeric" min={0}
+                              value={qty === 0 ? "" : qty} placeholder="0"
+                              onChange={e => setQtdManual(p.id, e.target.value)}
+                              style={{ fontFamily:"var(--display)", fontSize:20, width:44, textAlign:"center", background:"transparent", border:"none", outline:"none", color: qty>0?"var(--accent)":"var(--text-dim)" }}
+                            />
+                            <button className="pedido-qty-btn" onClick={() => inc(p.id)}>+</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+              {/* Produtos sem categoria */}
+              {catFiltro === "todas" && (() => {
+                const semCat = filtrados.filter(p => !p.categoria).sort((a,b)=>(a.nome||"").localeCompare(b.nome||""));
+                if (!semCat.length) return null;
+                return (
+                  <div key="sem-cat">
+                    <div className="pedido-cat-header">
+                      <span className="pedido-cat-label">Sem categoria</span>
+                      <span style={{ fontFamily:"var(--mono)", fontSize:10, color:"var(--text-dim)" }}>{semCat.length} item{semCat.length!==1?"s":""}</span>
+                    </div>
+                    {semCat.map(p => {
+                      const qty = qtds[p.id]||0;
+                      const estq = p.quantidade||0;
+                      return (
+                        <div key={p.id} className="pedido-item" style={{ background: qty > 0 ? "rgba(245,166,35,.04)" : undefined }}>
+                          <div className="pedido-item-info">
+                            <div className="pedido-item-name">{p.nome}</div>
+                            <div className="pedido-item-estoque">
+                              <span style={{ color: estq===0?"var(--danger)":estq<=5?"var(--accent)":"var(--text-dim)" }}>Estoque: {estq} un.</span>
+                            </div>
+                          </div>
+                          <div className="pedido-qty-ctrl">
+                            <button className="pedido-qty-btn" onClick={() => dec(p.id)}>−</button>
+                            <input type="number" inputMode="numeric" min={0} value={qty===0?"":qty} placeholder="0"
+                              onChange={e => setQtdManual(p.id, e.target.value)}
+                              style={{ fontFamily:"var(--display)", fontSize:20, width:44, textAlign:"center", background:"transparent", border:"none", outline:"none", color: qty>0?"var(--accent)":"var(--text-dim)" }}
+                            />
+                            <button className="pedido-qty-btn" onClick={() => inc(p.id)}>+</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </>
+        }
+      </div>
+
+      {/* Barra sticky */}
+      {totalItens > 0 && (
+        <div className="pedido-summary-bar">
+          <div style={{ flex:1 }}>
+            <div style={{ fontFamily:"var(--display)", fontSize:20, color:"var(--accent)" }}>
+              {totalItens} produto{totalItens!==1?"s":""} · {totalQtd} un.
+            </div>
+            <div style={{ fontFamily:"var(--mono)", fontSize:10, color:"var(--text-dim)", marginTop:2 }}>no pedido atual</div>
+          </div>
+          <button className="btn btn-outline" onClick={limpar} style={{ padding:"10px 14px" }}>
+            <Icon name="trash" size={14} /> Limpar
+          </button>
+          <button className="btn btn-accent" onClick={() => setShowModal(true)} style={{ padding:"10px 18px" }}>
+            <Icon name="fileText" size={14} /> Ver Pedido
+          </button>
+        </div>
+      )}
+
+      {/* Modal de revisão */}
+      {showModal && (
+        <div className="pedido-modal-overlay" onClick={() => setShowModal(false)}>
+          <div className="pedido-modal" onClick={e => e.stopPropagation()}>
+            <div className="pedido-modal-header">
+              <div className="pedido-modal-title">REVISÃO DO PEDIDO</div>
+              <button onClick={() => setShowModal(false)} style={{ background:"transparent", border:"none", color:"var(--text-dim)", cursor:"pointer", display:"flex" }}>
+                <Icon name="x" size={18} />
+              </button>
+            </div>
+            <div className="pedido-modal-body">
+              <div style={{ padding:"10px 20px 4px", display:"flex", justifyContent:"space-between", flexWrap:"wrap", gap:4 }}>
+                <span style={{ fontFamily:"var(--mono)", fontSize:10, color:"var(--text-dim)" }}>
+                  {resolveSetor(setor).label.toUpperCase()} · {new Date().toLocaleDateString("pt-BR")}
+                </span>
+                <span style={{ fontFamily:"var(--mono)", fontSize:10, color:"var(--accent)" }}>
+                  {totalItens} produto{totalItens!==1?"s":""} · {totalQtd} un.
+                </span>
+              </div>
+              {(() => {
+                const porCat = {};
+                itensSelecionados.forEach(p => {
+                  const cat = p.categoria||"Sem categoria";
+                  if (!porCat[cat]) porCat[cat] = [];
+                  porCat[cat].push(p);
+                });
+                return Object.entries(porCat).map(([cat, prods]) => (
+                  <div key={cat}>
+                    <div className="pedido-print-cat" style={{ paddingLeft:20, paddingRight:20 }}>{cat}</div>
+                    {prods.map(p => (
+                      <div key={p.id} className="pedido-print-item" style={{ paddingLeft:20, paddingRight:20 }}>
+                        <div>
+                          <div style={{ fontFamily:"var(--sans)", fontSize:13, fontWeight:600 }}>{p.nome}</div>
+                          <div style={{ fontFamily:"var(--mono)", fontSize:10, color:"var(--text-dim)", marginTop:2 }}>
+                            Estoque: {p.quantidade||0} un.
+                          </div>
+                        </div>
+                        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                          <div className="pedido-qty-ctrl">
+                            <button className="pedido-qty-btn" style={{ width:26, height:26 }} onClick={() => dec(p.id)}>−</button>
+                            <span style={{ fontFamily:"var(--display)", fontSize:22, minWidth:32, textAlign:"center", color:"var(--accent)" }}>{qtds[p.id]}</span>
+                            <button className="pedido-qty-btn" style={{ width:26, height:26 }} onClick={() => inc(p.id)}>+</button>
+                          </div>
+                          <span style={{ fontFamily:"var(--mono)", fontSize:11, color:"var(--text-dim)" }}>un.</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ));
+              })()}
+              <div style={{ height:16 }} />
+            </div>
+            <div className="pedido-modal-footer">
+              <button className="btn btn-outline" style={{ flex:1 }} onClick={copiar}>
+                {copiado ? <><Icon name="check" size={14} /> COPIADO!</> : <><Icon name="fileText" size={14} /> COPIAR</>}
+              </button>
+              <button className="btn btn-accent" style={{ flex:1 }} onClick={handleSalvar} disabled={salvando}>
+                {salvando ? <><span className="spinner" /> ENVIANDO...</> : <><Icon name="save" size={14} /> ENVIAR PEDIDO</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// PEDIDOS SCREEN — tela exclusiva para pedidos@gmail.com
+// ============================================================
+function PedidosScreen({ user, onLogout }) {
+  const addToast_ = useCallback((msg, type="info") => {
+    // toast simplificado embutido
+    const el = document.createElement("div");
+    el.textContent = msg;
+    el.style.cssText = `position:fixed;bottom:20px;right:16px;z-index:9999;background:${type==="success"?"#14241a":"#1e0f0f"};color:${type==="success"?"var(--success, #4ade80)":"var(--danger, #f87171)"};border-left:3px solid ${type==="success"?"#4ade80":"#f87171"};padding:11px 16px;font-family:monospace;font-size:12px;border-radius:0 4px 4px 0;animation:tin .3s ease;`;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+  }, []);
+
+  const [toasts, setToasts] = useState([]);
+  const addToast = useCallback((message, type="info") => {
+    const id = Date.now();
+    setToasts(p => [...p, { id, message, type }]);
+    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 3500);
+  }, []);
+
+  // Seleção de setor
+  const setoresDisponiveis = Object.entries(SETORES);
+  const [setorSel, setSetorSel] = useState(setoresDisponiveis[0]?.[0] || "");
+  const [pedidoKey, setPedidoKey] = useState(0); // força re-render ao salvar
+
+  return (
+    <>
+      <style>{styles}</style>
+      <div className="ps-wrap">
+        {/* Header */}
+        <header className="ps-header">
+          <div className="header-logo">PARK <span style={{ fontFamily:"var(--mono)", fontSize:11, color:"var(--accent)", letterSpacing:2, marginLeft:4 }}>PEDIDOS</span></div>
+          <div className="header-right">
+            <span className="header-email">{user.email}</span>
+            <button className="hbtn danger" onClick={onLogout}><Icon name="logout" size={14} /> SAIR</button>
+          </div>
+        </header>
+
+        <div className="ps-content">
+          {/* Título */}
+          <div className="page-hd" style={{ marginBottom:20 }}>
+            <div className="page-title">NOVO PEDIDO</div>
+            <div className="page-sub">Selecione o setor e os itens que precisa levar</div>
+          </div>
+
+          {/* Seleção de setor */}
+          <div style={{ display:"flex", gap:8, marginBottom:20, flexWrap:"wrap" }}>
+            {setoresDisponiveis.map(([key, s]) => (
+              <button
+                key={key}
+                className={`ftab ${setorSel===key?"active":""}`}
+                style={{ borderColor: setorSel===key ? s.color : undefined, color: setorSel===key ? s.color : undefined, background: setorSel===key ? `${s.color}15` : undefined }}
+                onClick={() => setSetorSel(key)}
+              >
+                <Icon name={s.iconName} size={13} /> {s.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Montar pedido */}
+          {setorSel && (
+            <MontarPedido
+              key={`${setorSel}-${pedidoKey}`}
+              setor={setorSel}
+              userEmail={user.email}
+              addToast={addToast}
+              onSaved={() => setPedidoKey(k => k+1)}
+            />
+          )}
+        </div>
+      </div>
+      <Toast toasts={toasts} />
+    </>
+  );
+}
+
+// ============================================================
+// PEDIDOS CONFIRMAR — aba para admins verem e confirmarem pedidos
+// ============================================================
+function PedidosConfirmar({ setor, addToast }) {
+  const [pedidos, setPedidos]   = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [filtro, setFiltro]     = useState("pendente"); // "pendente" | "concluido" | "todos"
+  const [confirmId, setConfirmId] = useState(null);
+
+  const colPedidos = "pedidos_globais";
+
+  const carregar = useCallback(async () => {
+    setLoading(true);
+    try {
+      const snap = await getDocs(query(collection(db, colPedidos), orderBy("criadoEm", "desc"), limit(40)));
+      // Filtra pelo setor atual
+      const todos = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+      const doSetor = todos.filter(p => p.setorKey === setor || p.setor === resolveSetor(setor).label);
+      setPedidos(doSetor);
+    } catch(e) { addToast("Erro: " + e.message, "error"); }
+    finally { setLoading(false); }
+  }, [setor]);
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  const confirmar = async (pedido) => {
+    setConfirmId(pedido.id);
+    try {
+      await updateDoc(doc(db, colPedidos, pedido.id), {
+        status: "concluido",
+        concluidoEm: serverTimestamp(),
+      });
+      addToast("Pedido marcado como entregue!", "success");
+      carregar();
+    } catch(e) { addToast("Erro: " + e.message, "error"); }
+    finally { setConfirmId(null); }
+  };
+
+  const filtrados = pedidos.filter(p => filtro === "todos" ? true : p.status === filtro);
+
+  return (
+    <div>
+      <div className="page-hd">
+        <div className="page-title">PEDIDOS</div>
+        <div className="page-sub">Pedidos recebidos — {resolveSetor(setor).label}</div>
+      </div>
+
+      {/* Filtro de status */}
+      <div className="filter-tabs" style={{ marginBottom:16 }}>
+        {[["pendente","⏳ Pendentes"],["concluido","✓ Entregues"],["todos","Todos"]].map(([k,l]) => (
+          <button key={k} className={`ftab ${filtro===k?"active":""}`} onClick={() => setFiltro(k)}>{l}
+            <span style={{ opacity:.7 }}> ({pedidos.filter(p => k==="todos" ? true : p.status===k).length})</span>
+          </button>
+        ))}
+        <button className="btn btn-outline" style={{ marginLeft:"auto", padding:"6px 12px", fontSize:10 }} onClick={carregar}>
+          <Icon name="arrowUp" size={12} /> Atualizar
+        </button>
+      </div>
+
+      {loading
+        ? <div className="empty"><span className="spinner" /></div>
+        : filtrados.length === 0
+          ? <div className="empty">{filtro==="pendente" ? "Nenhum pedido pendente." : "Nenhum pedido encontrado."}</div>
+          : filtrados.map(p => {
+              const data = p.criadoEm?.toDate ? p.criadoEm.toDate().toLocaleString("pt-BR") : "—";
+              const isPend = p.status === "pendente";
+              return (
+                <div key={p.id} className="pedconf-card" style={{ borderColor: isPend ? "rgba(250,204,21,.3)" : "var(--border)" }}>
+                  <div className="pedconf-header">
+                    <div>
+                      <div className="pedconf-title">{resolveSetor(setor).label}</div>
+                      <div className="pedconf-meta">por {p.criadoPor||"—"} · {data}</div>
+                    </div>
+                    <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:6 }}>
+                      {isPend
+                        ? <span className="pedconf-badge-pend">⏳ PENDENTE</span>
+                        : <span className="pedconf-badge-done"><Icon name="check" size={10} /> ENTREGUE</span>
+                      }
+                      <span style={{ fontFamily:"var(--mono)", fontSize:10, color:"var(--text-dim)" }}>
+                        {p.totalItens} produto{p.totalItens!==1?"s":""} · {p.totalQtd} un.
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Itens do pedido */}
+                  {(p.itens||[]).map((it, i) => (
+                    <div key={i} className="pedconf-item">
+                      <div>
+                        <div className="pedconf-item-name">{it.nome}</div>
+                        <div className="pedconf-item-cat">{it.categoria}</div>
+                      </div>
+                      <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+                        <div className="pedconf-item-qty">{it.quantidade}</div>
+                        <span style={{ fontFamily:"var(--mono)", fontSize:10, color:"var(--text-dim)" }}>un.</span>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Footer com ação */}
+                  {isPend && (
+                    <div className="pedconf-footer">
+                      <button
+                        className="btn btn-success btn-full"
+                        onClick={() => confirmar(p)}
+                        disabled={confirmId === p.id}
+                      >
+                        {confirmId === p.id
+                          ? <><span className="spinner" /> CONFIRMANDO...</>
+                          : <><Icon name="check" size={15} /> CONFIRMAR ENTREGA</>
+                        }
+                      </button>
+                    </div>
+                  )}
+                  {!isPend && p.concluidoEm && (
+                    <div style={{ padding:"8px 16px", background:"rgba(74,222,128,.04)", borderTop:"1px solid var(--border)" }}>
+                      <span style={{ fontFamily:"var(--mono)", fontSize:10, color:"var(--success)" }}>
+                        Entregue em: {p.concluidoEm.toDate ? p.concluidoEm.toDate().toLocaleString("pt-BR") : "—"}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+      }
+    </div>
+  );
+}
 export default function App() {
   const [user, setUser]       = useState(null);
   const [setor, setSetor]     = useState(null);    // pode ser key de SETORES ou FERRAMENTAS_SUB
@@ -2363,6 +2831,7 @@ export default function App() {
     { id:"dashboard",  icon:"home",      label:"Home"    },
     { id:"entrada",    icon:"arrowUp",   label:"Entrada" },
     { id:"saida",      icon:"arrowDown", label:"Saída"   },
+    { id:"pedidos",    icon:"clipboard",  label:"Pedidos" },
     { id:"inventario", icon:"package",   label:"Estoque" },
     { id:"analytics",  icon:"barChart",  label:"Analytics" },
     { id:"log",        icon:"fileText",  label:"Log"     },
@@ -2370,12 +2839,17 @@ export default function App() {
   ];
   const navGroups = [
     { group:"GERAL",     items:[navItems[0]] },
-    { group:"MOVIMENT.", items:[navItems[1], navItems[2]] },
-    { group:"CONTROLE",  items:[navItems[3], navItems[4]] },
-    { group:"SISTEMA",   items:[navItems[5], navItems[6]] },
+    { group:"MOVIMENT.", items:[navItems[1], navItems[2], navItems[3]] },
+    { group:"CONTROLE",  items:[navItems[4], navItems[5]] },
+    { group:"SISTEMA",   items:[navItems[6], navItems[7]] },
   ];
 
   if (!user) return <><style>{styles}</style><LoginScreen onLogin={setUser} /><Toast toasts={toasts} /></>;
+
+  // Usuário exclusivo de pedidos — tela própria, sem acesso a setores
+  if (isPedidosUser(user)) {
+    return <PedidosScreen user={user} onLogout={logout} />;
+  }
 
   if (!setor) {
     return (
@@ -2437,6 +2911,7 @@ export default function App() {
               {tab==="dashboard"  && <Dashboard   setor={setor} products={products} thresh={thresh} />}
               {tab==="entrada"    && <Entrada     setor={setor} onRefresh={() => loadProducts(setor)} addToast={addToast} user={user} />}
               {tab==="saida"      && <Saida       setor={setor} onRefresh={() => loadProducts(setor)} addToast={addToast} user={user} />}
+              {tab==="pedidos"    && <PedidosConfirmar setor={setor} addToast={addToast} />}
               {tab==="inventario" && <Inventario  setor={setor} products={products} onDelete={() => loadProducts(setor)} addToast={addToast} thresh={thresh} />}
               {tab==="analytics"  && <Analytics   setor={setor} products={products} />}
               {tab==="log"        && <LogCompleto setor={setor} addToast={addToast} />}
