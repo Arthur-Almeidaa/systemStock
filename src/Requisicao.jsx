@@ -686,7 +686,7 @@ export default function RequisicaoApp() {
             href="/Baixar/index.html" 
             className="req-badge btn-download"
           >
-            📥 APP
+            App Andoid
           </a>
 
           {setor && fase === "form" && (
