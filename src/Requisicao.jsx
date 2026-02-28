@@ -200,6 +200,20 @@ const css = `
   border-color: var(--success);
   color: var(--success);
 }
+  
+/* Estilo para o botão iOS (Vermelho) */
+.btn-ios {
+  text-decoration: none;
+  border-color: var(--danger);
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.btn-ios:hover {
+  background: rgba(248, 113, 113, 0.1);
+  border-color: var(--danger);
+}
+
 `;
 
 // ─── Helpers ─────────────────────────────────────────────────
@@ -681,12 +695,14 @@ export default function RequisicaoApp() {
         <div className="req-logo">PARK</div>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           
-          {/* BOTÃO QUE ENCAMINHA PARA A PASTA BAIXAR */}
-          <a 
-            href="/Baixar/index.html" 
-            className="req-badge btn-download"
-          >
-            App Andoid
+          {/* BOTÃO ANDROID (VERDE) */}
+          <a href="/Baixar/index.html" className="req-badge btn-download">
+             APP Android
+          </a>
+
+          {/* NOVO BOTÃO IOS (VERMELHO) */}
+          <a href="/Baixar/ios.html" className="req-badge btn-ios">
+             APP IOS
           </a>
 
           {setor && fase === "form" && (
@@ -697,8 +713,7 @@ export default function RequisicaoApp() {
           )}
           <span className="req-badge" style={{ cursor: "default" }}>REQ</span>
         </div>
-      </header>
-
+</header>
         <div className="req-content">
 
           {/* Setores */}
