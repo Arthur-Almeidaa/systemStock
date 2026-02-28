@@ -1,4 +1,11 @@
-
+/**
+ * REQUISICAO.JSX — Página pública de requisições por setor
+ * Cada setor tem uma senha de 4 dígitos configurada no Firestore.
+ * Importar e usar em uma rota separada (ex: /requisicao)
+ *
+ * Firebase config reutilizada do App.jsx principal.
+ * Necessário: npm install firebase
+ */
 
 import { useState, useEffect, useRef } from "react";
 import { initializeApp, getApps } from "firebase/app";
@@ -190,6 +197,7 @@ const css = `
   .prod-item:last-child { border-bottom:none; }
   .prod-item:hover,.prod-item:active { background:var(--surface2); }
   .prod-item.selected { background:rgba(245,166,35,.06); }
+  .prod-item.out-of-stock { opacity:.45; cursor:not-allowed; }
   .prod-name { font-family:var(--sans); font-size:13px; font-weight:600; }
   .prod-cat { font-family:var(--mono); font-size:10px; color:var(--text-dim); }
   .prod-check { width:22px; height:22px; border-radius:50%; border:2px solid var(--border2); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
@@ -315,15 +323,23 @@ function AddItemModal({ setorKey, onAdd, onClose, jaAdicionados }) {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
+  // estoqueMap: { nomeProduto: quantidade_em_estoque }
+  const [estoqueMap, setEstoqueMap] = useState({});
+
   useEffect(() => {
     (async () => {
       try {
-        const [sc, sp] = await Promise.all([
+        const [sc, sp, se] = await Promise.all([
           getDocs(collection(db, getCol(setorKey, "categorias"))),
           getDocs(collection(db, getCol(setorKey, "produtos_padrao"))),
+          getDocs(collection(db, getCol(setorKey, "produtos"))),
         ]);
         setCats(sc.docs.map(d => ({ id: d.id, ...d.data() })));
         setProdutos(sp.docs.map(d => ({ id: d.id, ...d.data() })));
+        // montar mapa nome→quantidade
+        const map = {};
+        se.docs.forEach(d => { const dat = d.data(); map[dat.nome] = dat.quantidade || 0; });
+        setEstoqueMap(map);
       } catch { }
       finally { setLoading(false); }
     })();
@@ -369,32 +385,57 @@ function AddItemModal({ setorKey, onAdd, onClose, jaAdicionados }) {
               )}
               {filtrados.length === 0
                 ? <div className="empty">Nenhum produto disponível.</div>
-                : filtrados.map(p => (
-                  <div key={p.id} className={`prod-item ${sel?.id === p.id ? "selected" : ""}`} onClick={() => { setSel(p); setQtd(1); }}>
-                    <div>
-                      <div className="prod-name">{p.nome}</div>
-                      <div className="prod-cat">{p.categoria}</div>
+                : filtrados.map(p => {
+                  const dispQtd = estoqueMap[p.nome] !== undefined ? estoqueMap[p.nome] : null;
+                  const semEstoque = dispQtd !== null && dispQtd <= 0;
+                  return (
+                    <div key={p.id}
+                      className={`prod-item ${sel?.id === p.id ? "selected" : ""} ${semEstoque ? "out-of-stock" : ""}`}
+                      onClick={() => { if (!semEstoque) { setSel(p); setQtd(1); } }}
+                    >
+                      <div style={{ flex:1 }}>
+                        <div className="prod-name">{p.nome}</div>
+                        <div className="prod-cat">{p.categoria}</div>
+                        {dispQtd !== null && (
+                          <div style={{ fontFamily:"var(--mono)", fontSize:10, marginTop:3, color: dispQtd > 0 ? "var(--success)" : "var(--danger)" }}>
+                            {dispQtd > 0 ? `Disponível: ${dispQtd} un.` : "⚠ Sem estoque"}
+                          </div>
+                        )}
+                      </div>
+                      <div className={`prod-check ${sel?.id === p.id ? "on" : ""}`}>
+                        {sel?.id === p.id && <span style={{ color: "#0a0a0a", fontSize: 12 }}>✓</span>}
+                      </div>
                     </div>
-                    <div className={`prod-check ${sel?.id === p.id ? "on" : ""}`}>
-                      {sel?.id === p.id && <span style={{ color: "#0a0a0a", fontSize: 12 }}>✓</span>}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
             </>
           )}
         </div>
         <div className="modal-footer">
-          {sel && (
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-              <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--text-dim)", flex: 1 }}>Qtd: {sel.nome}</span>
-              <div className="qty-controls">
-                <button className="qty-btn" onClick={() => setQtd(q => Math.max(1, q - 1))}>−</button>
-                <div className="qty-val">{qtd}</div>
-                <button className="qty-btn" onClick={() => setQtd(q => q + 1)}>+</button>
+          {sel && (() => {
+            const maxQtd = estoqueMap[sel.nome] !== undefined ? estoqueMap[sel.nome] : Infinity;
+            const excede = qtd > maxQtd;
+            return (
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--text-dim)", flex: 1 }}>{sel.nome}</span>
+                  <div className="qty-controls">
+                    <button className="qty-btn" onClick={() => setQtd(q => Math.max(1, q - 1))}>−</button>
+                    <div className="qty-val">{qtd}</div>
+                    <button className="qty-btn" onClick={() => setQtd(q => maxQtd === Infinity ? q + 1 : Math.min(maxQtd, q + 1))}>+</button>
+                  </div>
+                </div>
+                {maxQtd !== Infinity && maxQtd > 0 && (
+                  <div style={{ fontFamily:"var(--mono)", fontSize:10, color: excede ? "var(--danger)" : "var(--text-dim)", marginBottom:8 }}>
+                    {excede
+                      ? `⚠ Máx disponível: ${maxQtd} un. — se precisar de mais, use a observação.`
+                      : `Disponível no estoque: ${maxQtd} un.`}
+                  </div>
+                )}
               </div>
-            </div>
-          )}
-          <button className="btn btn-accent btn-full btn-lg" onClick={confirmar} disabled={!sel}>
+            );
+          })()}
+          <button className="btn btn-accent btn-full btn-lg" onClick={confirmar} disabled={!sel || (() => { const m = estoqueMap[sel.nome]; return m !== undefined && m <= 0; })()}>
             ADICIONAR {sel ? `"${sel.nome}" (${qtd}x)` : "ITEM"}
           </button>
         </div>
@@ -408,9 +449,19 @@ function FormRequisicao({ setorKey, setor, user, onBack, toast }) {
   const [itens, setItens] = useState([]);
   const [obs, setObs] = useState("");
   const [solicitante, setSolicitante] = useState("");
+  const [usuarios, setUsuarios] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [enviado, setEnviado] = useState(null);
+
+  // Carregar usuários cadastrados para este setor
+  useEffect(() => {
+    getDocs(collection(db, getCol(setorKey, "req_usuarios")))
+      .then(s => setUsuarios(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b) => a.nome.localeCompare(b.nome))))
+      .catch(() => setUsuarios([]))
+      .finally(() => setLoadingUsers(false));
+  }, [setorKey]);
 
   const remover = (idx) => setItens(p => p.filter((_, i) => i !== idx));
 
@@ -468,8 +519,34 @@ function FormRequisicao({ setorKey, setor, user, onBack, toast }) {
         <div className="card-title">NOVA REQUISIÇÃO</div>
 
         <div className="form-group">
-          <label className="form-label">Solicitante *</label>
-          <input className="form-input" placeholder="Seu nome..." value={solicitante} onChange={e => setSolicitante(e.target.value)} />
+          <label className="form-label">Quem está pedindo? *</label>
+          {loadingUsers
+            ? <div style={{ padding:"10px 0" }}><span className="spinner"/></div>
+            : usuarios.length === 0
+              ? <input className="form-input" placeholder="Seu nome..." value={solicitante} onChange={e => setSolicitante(e.target.value)} />
+              : (
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:8 }}>
+                  {usuarios.map(u => (
+                    <button
+                      key={u.id}
+                      onClick={() => setSolicitante(u.nome)}
+                      style={{
+                        padding:"12px 10px", cursor:"pointer", textAlign:"left",
+                        background: solicitante === u.nome ? "rgba(245,166,35,.12)" : "var(--surface2)",
+                        border: `1px solid ${solicitante === u.nome ? "var(--accent)" : "var(--border)"}`,
+                        borderRadius:"var(--r)", color:"var(--text)",
+                        fontFamily:"var(--mono)", fontSize:13,
+                        display:"flex", alignItems:"center", gap:8,
+                        transition:"all .15s",
+                      }}
+                    >
+                      <span style={{ fontSize:16 }}>👤</span>
+                      {u.nome}
+                      {solicitante === u.nome && <span style={{ marginLeft:"auto", color:"var(--accent)" }}>✓</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
         </div>
 
         <div className="divider" />

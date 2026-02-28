@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { Analytics } from "./Analytics.jsx";
+import { Configuracoes } from "./Configuracoes.jsx";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import {
@@ -48,12 +50,12 @@ const Icon = ({ name, size = 18, color = "currentColor", style = {} }) => {
     plus: <><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></>,
     search: <><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
     cpu: <><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></>,
-    maintenance: <><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></>,
     grid: <><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></>,
     chevronRight: <><polyline points="9 18 15 12 9 6"/></>,
     clipboardList: <><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><line x1="12" y1="11" x2="16" y2="11"/><line x1="12" y1="16" x2="16" y2="16"/><line x1="8" y1="11" x2="8.01" y2="11"/><line x1="8" y1="16" x2="8.01" y2="16"/></>,
     key: <><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></>,
     bell: <><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></>,
+    truck: <><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display:"inline-block", flexShrink:0, ...style }}>
@@ -70,7 +72,7 @@ const SETORES = {
   ferramentas: { label:"Ferramentas", iconName:"tools",    color:"#a855f7", col:"estoque_ferramentas" },
 };
 const FERRAMENTAS_SUB = {
-  fti:         { label:"T.I",      iconName:"cpu",    color:"#38bdf8", col:"estoque_ferramentas_ti"         },
+  fti:         { label:"T.I",        iconName:"cpu",    color:"#38bdf8", col:"estoque_ferramentas_ti"         },
   fmanutencao: { label:"Manutenção", iconName:"hammer", color:"#fb923c", col:"estoque_ferramentas_manutencao" },
 };
 const IS_FERR_SUB = (k) => k === "fti" || k === "fmanutencao";
@@ -83,16 +85,7 @@ const resolveSetor = (setor) => {
 const getCol = (setor, type) => `${resolveSetor(setor).col}_${type}`;
 const fmtDate = (ts) => { if (!ts) return "—"; const d = ts.toDate ? ts.toDate() : new Date(ts); return d.toLocaleString("pt-BR"); };
 const DEFAULT_THRESH = { baixo: 5, medio: 15 };
-const PEDIDOS_EMAIL = "pedidos@gmail.com";
-const isPedidosUser = (u) => u?.email?.toLowerCase() === PEDIDOS_EMAIL;
 
-function getStatus(qtd, thresh) {
-  const t = thresh || DEFAULT_THRESH;
-  if (qtd <= 0) return "zero";
-  if (qtd <= t.baixo) return "baixo";
-  if (qtd <= t.medio) return "medio";
-  return "alto";
-}
 const registrarLog = (setor, tipo, dados) =>
   addDoc(collection(db, getCol(setor, "log")), { tipo, ...dados, ts: serverTimestamp() });
 
@@ -241,12 +234,6 @@ const styles = `
   .err-msg { background:rgba(248,113,113,.08); border:1px solid var(--danger); color:var(--danger); padding:10px 14px; font-family:var(--mono); font-size:12px; margin-top:12px; border-radius:var(--r); }
   .divider { height:1px; background:var(--border); margin:16px 0; }
   .entrada-preview { background:var(--surface2); border:1px solid var(--accent); border-radius:var(--r); padding:16px; margin:14px 0; }
-  .thresh-row { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--border); }
-  .thresh-row:last-child { border-bottom:none; }
-  .thresh-label { font-family:var(--mono); font-size:11px; color:var(--text-dim); width:70px; flex-shrink:0; }
-  .thresh-slider { flex:1; -webkit-appearance:none; appearance:none; height:4px; border-radius:2px; outline:none; cursor:pointer; }
-  .thresh-slider::-webkit-slider-thumb { -webkit-appearance:none; width:20px; height:20px; border-radius:50%; cursor:pointer; border:2px solid var(--bg); }
-  .thresh-val { font-family:var(--display); font-size:22px; width:36px; text-align:right; flex-shrink:0; }
   .scanner-fs { position:fixed; inset:0; z-index:2000; background:#000; display:flex; flex-direction:column; }
   .scanner-video-bg { flex:1; position:relative; overflow:hidden; }
   .scanner-video-bg video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
@@ -286,7 +273,7 @@ const styles = `
   .log-entry { display:grid; grid-template-columns:12px 1fr auto; gap:10px; align-items:start; padding:10px 16px; border-bottom:1px solid var(--border); }
   .log-entry:last-child { border-bottom:none; }
   .log-dot { width:7px; height:7px; border-radius:50%; margin-top:4px; flex-shrink:0; }
-  .log-dot.in { background:var(--success); } .log-dot.out { background:var(--danger); } .log-dot.config { background:var(--info); }
+  .log-dot.in { background:var(--success); } .log-dot.out { background:var(--danger); } .log-dot.config { background:var(--info); } .log-dot.req { background:#f97316; }
   .log-action { font-family:var(--mono); font-size:12px; color:var(--text); }
   .log-detail { font-family:var(--mono); font-size:10px; color:var(--text-dim); margin-top:2px; }
   .log-time { font-family:var(--mono); font-size:10px; color:var(--text-dim); white-space:nowrap; }
@@ -315,11 +302,6 @@ const styles = `
   .rank-bar-fill { height:100%; border-radius:3px; background:var(--accent); }
   .rank-val { font-family:var(--display); font-size:20px; text-align:right; }
   .rank-sub { font-family:var(--mono); font-size:9px; color:var(--text-dim); text-align:right; }
-  .bar-chart { display:flex; align-items:flex-end; gap:6px; height:80px; padding:0 4px; }
-  .bar-col { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; }
-  .bar-fill { width:100%; border-radius:2px 2px 0 0; min-height:2px; transition:height .3s; }
-  .bar-label { font-family:var(--mono); font-size:8px; color:var(--text-dim); white-space:nowrap; letter-spacing:.5px; }
-  .bar-val { font-family:var(--display); font-size:13px; color:var(--text-dim); }
   .alert-row { display:flex; align-items:center; gap:12px; padding:12px 16px; border-bottom:1px solid var(--border); }
   .alert-row:last-child { border-bottom:none; }
   .alert-days { font-family:var(--display); font-size:28px; flex-shrink:0; width:56px; text-align:center; }
@@ -336,8 +318,6 @@ const styles = `
   .dup-modal-btns { display:flex; flex-direction:column; gap:8px; }
   .inline-edit-row { display:flex; align-items:center; gap:6px; }
   .inline-edit-row input { flex:1; background:var(--surface2); border:1px solid var(--accent); color:var(--text); padding:7px 10px; font-family:var(--mono); font-size:13px; outline:none; border-radius:var(--r); }
-
-  /* ── Requisições ── */
   .req-detail-overlay { position:fixed; inset:0; background:rgba(0,0,0,.88); z-index:1000; display:flex; align-items:center; justify-content:center; padding:20px; }
   .req-detail-box { background:var(--surface); border:1px solid var(--border2); width:100%; max-width:520px; max-height:90vh; overflow-y:auto; border-radius:var(--r); }
   .req-detail-header { display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--surface); z-index:2; }
@@ -352,17 +332,11 @@ const styles = `
   .req-card:hover,.req-card:active { background:var(--surface2); }
   .req-card-top { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px; flex-wrap:wrap; }
   .req-codigo { font-family:var(--display); font-size:18px; letter-spacing:2px; color:var(--accent); }
-  .req-setor-tag { font-family:var(--mono); font-size:9px; padding:2px 8px; border:1px solid var(--border2); color:var(--text-dim); border-radius:var(--r); }
   .req-meta { font-family:var(--mono); font-size:10px; color:var(--text-dim); margin-bottom:4px; }
   .req-items-preview { font-family:var(--mono); font-size:11px; color:var(--text-mid); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .pin-cfg-wrap { display:flex; gap:8px; align-items:center; }
-  .pin-cfg-input { background:var(--surface2); border:1px solid var(--border2); color:var(--text); padding:10px 14px; font-family:var(--mono); font-size:18px; letter-spacing:8px; outline:none; border-radius:var(--r); width:120px; text-align:center; }
-  .pin-cfg-input:focus { border-color:var(--accent); }
 `;
 
-// ============================================================
-// SCANNER
-// ============================================================
+// ─── SCANNER ─────────────────────────────────────────────────
 const CONFIRMS = 3;
 function ScannerModal({ onScan, onClose, title }) {
   const videoRef = useRef(null), streamRef = useRef(null), animRef = useRef(null);
@@ -375,7 +349,7 @@ function ScannerModal({ onScan, onClose, title }) {
   useEffect(() => {
     (async () => {
       try {
-        const tmp = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal:"environment" } } });
+        const tmp = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ ideal:"environment" } } });
         tmp.getTracks().forEach(t => t.stop());
         const devs = await navigator.mediaDevices.enumerateDevices();
         const vids = devs.filter(d => d.kind === "videoinput");
@@ -533,7 +507,7 @@ function ScannerModal({ onScan, onClose, title }) {
   );
 }
 
-// ─── HELPERS VISUAIS ─────────────────────────────────────────
+// ─── Helpers visuais ─────────────────────────────────────────
 const Toast = ({ toasts }) => (
   <div className="toast-wrap">
     {toasts.map(t => (
@@ -545,12 +519,20 @@ const Toast = ({ toasts }) => (
   </div>
 );
 
-const statusColor = (st) => ({ zero:"var(--danger)", baixo:"var(--accent)", medio:"var(--warn)" }[st] || "var(--success)");
-const statusLabel = (st) => {
+const statusColor  = (st) => ({ zero:"var(--danger)", baixo:"var(--accent)", medio:"var(--warn)" }[st] || "var(--success)");
+const statusLabel  = (st) => {
   const map = { zero:["badge-zero","ZERADO"], baixo:["badge-low","BAIXO"], medio:["badge-med","MÉDIO"] };
   const [cls, txt] = map[st] || ["badge-ok","OK"];
   return <span className={`badge ${cls}`}>{txt}</span>;
 };
+
+function getStatus(qtd, thresh) {
+  const t = thresh || DEFAULT_THRESH;
+  if (qtd <= 0) return "zero";
+  if (qtd <= t.baixo) return "baixo";
+  if (qtd <= t.medio) return "medio";
+  return "alto";
+}
 
 function StatusBar({ qtd, thresh }) {
   const t = thresh || DEFAULT_THRESH;
@@ -565,128 +547,56 @@ function StatusBar({ qtd, thresh }) {
   );
 }
 
-// ─── SEARCH BOX ──────────────────────────────────────────────
-const HIST_KEY = (ctx) => `park_search_hist_${ctx}`;
-const loadHistory = (ctx) => { try { return JSON.parse(localStorage.getItem(HIST_KEY(ctx)) || "[]"); } catch { return []; } };
-const saveToHistory = (ctx, term) => {
-  if (!term?.trim() || term.trim().length < 2) return;
-  try {
-    const prev = loadHistory(ctx);
-    localStorage.setItem(HIST_KEY(ctx), JSON.stringify([term.trim(), ...prev.filter(h => h.toLowerCase() !== term.trim().toLowerCase())].slice(0, 8)));
-  } catch {}
-};
-
-function SearchBox({ ctx, value, onChange, placeholder = "Buscar...", suggestions = [], style = {} }) {
-  const [open, setOpen] = useState(false), [hist, setHist] = useState([]);
-  const inputRef = useRef(null), wrapRef = useRef(null);
-
-  useEffect(() => { setHist(loadHistory(ctx)); }, [ctx]);
-  useEffect(() => {
-    const handler = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const q = value.toLowerCase();
-  const filteredHist = hist.filter(h => !q || h.toLowerCase().includes(q));
-  const filteredSugg = suggestions.filter(s => s && (!q || s.toLowerCase().includes(q)) && !filteredHist.some(h => h.toLowerCase() === s.toLowerCase()));
-  const hasItems = filteredHist.length > 0 || filteredSugg.length > 0;
-
-  const pick = (term) => { onChange(term); saveToHistory(ctx, term); setHist(loadHistory(ctx)); setOpen(false); inputRef.current?.blur(); };
-  const handleDelHist = (term, e) => { e.stopPropagation(); const next = hist.filter(h => h !== term); try { localStorage.setItem(HIST_KEY(ctx), JSON.stringify(next)); } catch {} setHist(next); };
-
+// ─── SearchBox simples (sem localStorage) ────────────────────
+function SearchBox({ value, onChange, placeholder = "Buscar...", style = {} }) {
   return (
-    <div ref={wrapRef} style={{ position:"relative", ...style }}>
-      <div style={{ display:"flex", alignItems:"center", background:"var(--surface2)", border:`1px solid ${open?"var(--accent)":"var(--border2)"}`, borderRadius:"var(--r)", overflow:"hidden" }}>
-        <span style={{ padding:"0 10px", display:"flex", alignItems:"center", color:"var(--text-dim)", flexShrink:0 }}><Icon name="search" size={14}/></span>
-        <input ref={inputRef} type="text" value={value} onChange={e => { onChange(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)}
-          onKeyDown={e => { if (e.key==="Escape"){setOpen(false);onChange("");} if(e.key==="Enter"&&value.trim()){saveToHistory(ctx,value);setHist(loadHistory(ctx));setOpen(false);} }}
-          placeholder={placeholder}
-          style={{ flex:1, background:"transparent", border:"none", outline:"none", color:"var(--text)", fontFamily:"var(--mono)", fontSize:13, padding:"10px 0", minWidth:0 }}
-        />
-        {value && <button onClick={() => { onChange(""); setOpen(false); inputRef.current?.focus(); }} style={{ padding:"0 10px", background:"transparent", border:"none", color:"var(--text-dim)", cursor:"pointer", display:"flex", alignItems:"center" }}><Icon name="x" size={13}/></button>}
-      </div>
-      {open && hasItems && (
-        <div style={{ position:"absolute", top:"calc(100% + 4px)", left:0, right:0, background:"var(--surface)", border:"1px solid var(--border2)", borderRadius:"var(--r)", zIndex:500, overflow:"hidden", boxShadow:"0 8px 24px rgba(0,0,0,.5)" }}>
-          {filteredHist.length > 0 && (
-            <>
-              <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"6px 12px 4px", borderBottom:"1px solid var(--border)" }}>
-                <span style={{ fontFamily:"var(--mono)", fontSize:9, color:"var(--text-dim)", letterSpacing:2, textTransform:"uppercase" }}>Recentes</span>
-                <button onClick={e => { e.stopPropagation(); try{localStorage.removeItem(HIST_KEY(ctx));}catch{} setHist([]); }} style={{ background:"transparent", border:"none", color:"var(--text-dim)", cursor:"pointer", fontFamily:"var(--mono)", fontSize:9, letterSpacing:1, display:"flex", alignItems:"center", gap:4 }}>
-                  <Icon name="trash" size={11}/> LIMPAR
-                </button>
-              </div>
-              {filteredHist.map(h => (
-                <div key={h} onClick={() => pick(h)} style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 12px", cursor:"pointer", borderBottom:"1px solid var(--border)" }}
-                  onMouseEnter={e => e.currentTarget.style.background="var(--surface2)"} onMouseLeave={e => e.currentTarget.style.background="transparent"}>
-                  <Icon name="fileText" size={13} color="var(--text-dim)" style={{ flexShrink:0 }}/>
-                  <span style={{ flex:1, fontFamily:"var(--mono)", fontSize:12 }}>{h}</span>
-                  <button onClick={e => handleDelHist(h,e)} style={{ background:"transparent", border:"none", color:"var(--text-dim)", cursor:"pointer", padding:2, display:"flex", alignItems:"center" }}><Icon name="x" size={11}/></button>
-                </div>
-              ))}
-            </>
-          )}
-          {filteredSugg.length > 0 && (
-            <>
-              <div style={{ padding:"6px 12px 4px", borderBottom:"1px solid var(--border)", borderTop:filteredHist.length>0?"1px solid var(--border)":"none" }}>
-                <span style={{ fontFamily:"var(--mono)", fontSize:9, color:"var(--text-dim)", letterSpacing:2, textTransform:"uppercase" }}>Sugestões</span>
-              </div>
-              {filteredSugg.slice(0,6).map(s => (
-                <div key={s} onClick={() => pick(s)} style={{ display:"flex", alignItems:"center", gap:8, padding:"9px 12px", cursor:"pointer", borderBottom:"1px solid var(--border)" }}
-                  onMouseEnter={e => e.currentTarget.style.background="var(--surface2)"} onMouseLeave={e => e.currentTarget.style.background="transparent"}>
-                  <Icon name="search" size={13} color="var(--accent)" style={{ flexShrink:0 }}/>
-                  <span style={{ flex:1, fontFamily:"var(--mono)", fontSize:12 }}>{s}</span>
-                </div>
-              ))}
-            </>
-          )}
-        </div>
-      )}
+    <div style={{ display:"flex", alignItems:"center", background:"var(--surface2)", border:"1px solid var(--border2)", borderRadius:"var(--r)", overflow:"hidden", marginBottom:10, ...style }}>
+      <span style={{ padding:"0 10px", color:"var(--text-dim)", display:"flex" }}><Icon name="search" size={14}/></span>
+      <input type="text" value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        style={{ flex:1, background:"transparent", border:"none", outline:"none", color:"var(--text)", fontFamily:"var(--mono)", fontSize:13, padding:"10px 0" }}/>
+      {value && <button onClick={() => onChange("")} style={{ padding:"0 10px", background:"transparent", border:"none", color:"var(--text-dim)", cursor:"pointer", display:"flex" }}><Icon name="x" size={13}/></button>}
     </div>
   );
 }
 
-// ============================================================
-// SELECT SEARCH
-// ============================================================
+// ─── SelectSearch ────────────────────────────────────────────
 function SelectSearch({ value, onChange, options, placeholder = "Selecionar...", label, emptyLabel = "Todas", allowEmpty = false }) {
-  const [open, setOpen]   = useState(false);
+  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const wrapRef           = useRef(null);
-  const inputRef          = useRef(null);
-
+  const wrapRef = useRef(null);
+  const inputRef = useRef(null);
   useEffect(() => {
     const handler = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
-
   const filtered = options.filter(o => !query || o.toLowerCase().includes(query.toLowerCase()));
   const pick = (val) => { onChange(val); setQuery(""); setOpen(false); };
-  const displayValue = value || "";
-
   return (
     <div ref={wrapRef} style={{ position:"relative" }}>
       {label && <label className="form-label">{label}</label>}
       <div onClick={() => { setOpen(o => !o); setTimeout(() => inputRef.current?.focus(), 50); }}
-        style={{ display:"flex", alignItems:"center", gap:8, background:"var(--surface2)", border:`1px solid ${open ? "var(--accent)" : "var(--border2)"}`, borderRadius:"var(--r)", padding:"12px 14px", cursor:"pointer", transition:"border-color .2s", minHeight:48 }}>
+        style={{ display:"flex", alignItems:"center", gap:8, background:"var(--surface2)", border:`1px solid ${open?"var(--accent)":"var(--border2)"}`, borderRadius:"var(--r)", padding:"12px 14px", cursor:"pointer", minHeight:48 }}>
         <Icon name="search" size={14} color="var(--text-dim)" />
-        <span style={{ flex:1, fontFamily:"var(--mono)", fontSize:14, color: displayValue ? "var(--text)" : "var(--text-dim)" }}>{displayValue || placeholder}</span>
-        {displayValue && (<button onClick={e => { e.stopPropagation(); pick(""); }} style={{ background:"transparent", border:"none", color:"var(--text-dim)", cursor:"pointer", display:"flex", alignItems:"center", padding:2 }}><Icon name="x" size={13} /></button>)}
-        <Icon name="chevronRight" size={13} color="var(--text-dim)" style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)", transition:"transform .2s" }} />
+        <span style={{ flex:1, fontFamily:"var(--mono)", fontSize:14, color:value?"var(--text)":"var(--text-dim)" }}>{value || placeholder}</span>
+        {value && <button onClick={e => { e.stopPropagation(); pick(""); }} style={{ background:"transparent", border:"none", color:"var(--text-dim)", cursor:"pointer", display:"flex", padding:2 }}><Icon name="x" size={13}/></button>}
+        <Icon name="chevronRight" size={13} color="var(--text-dim)" style={{ transform:open?"rotate(90deg)":"rotate(0deg)", transition:"transform .2s" }}/>
       </div>
       {open && (
         <div style={{ position:"absolute", top:"calc(100% + 4px)", left:0, right:0, background:"var(--surface)", border:"1px solid var(--border2)", borderRadius:"var(--r)", zIndex:600, boxShadow:"0 8px 24px rgba(0,0,0,.6)", overflow:"hidden" }}>
           <div style={{ padding:8, borderBottom:"1px solid var(--border)", display:"flex", alignItems:"center", gap:6, background:"var(--surface2)" }}>
             <Icon name="search" size={13} color="var(--accent)" />
-            <input ref={inputRef} type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar..." style={{ flex:1, background:"transparent", border:"none", outline:"none", color:"var(--text)", fontFamily:"var(--mono)", fontSize:13, padding:"2px 0" }} onKeyDown={e => { if (e.key === "Escape") setOpen(false); }} />
-            {query && <button onClick={() => setQuery("")} style={{ background:"transparent", border:"none", color:"var(--text-dim)", cursor:"pointer", display:"flex" }}><Icon name="x" size={12} /></button>}
+            <input ref={inputRef} type="text" value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar..." style={{ flex:1, background:"transparent", border:"none", outline:"none", color:"var(--text)", fontFamily:"var(--mono)", fontSize:13, padding:"2px 0" }} onKeyDown={e => { if(e.key==="Escape") setOpen(false); }} />
           </div>
           <div style={{ maxHeight:220, overflowY:"auto" }}>
-            {allowEmpty && (<div onClick={() => pick("")} style={{ padding:"10px 14px", cursor:"pointer", fontFamily:"var(--mono)", fontSize:12, color:"var(--text-dim)", borderBottom:"1px solid var(--border)", background: value === "" ? "rgba(245,166,35,.08)" : "transparent" }} onMouseEnter={e => e.currentTarget.style.background="var(--surface2)"} onMouseLeave={e => e.currentTarget.style.background = value === "" ? "rgba(245,166,35,.08)" : "transparent"}>{emptyLabel}</div>)}
+            {allowEmpty && <div onClick={() => pick("")} style={{ padding:"10px 14px", cursor:"pointer", fontFamily:"var(--mono)", fontSize:12, color:"var(--text-dim)", borderBottom:"1px solid var(--border)" }}>{emptyLabel}</div>}
             {filtered.length === 0
               ? <div style={{ padding:"12px 14px", fontFamily:"var(--mono)", fontSize:12, color:"var(--text-dim)" }}>Nenhum resultado</div>
-              : filtered.map(o => (<div key={o} onClick={() => pick(o)} style={{ padding:"10px 14px", cursor:"pointer", fontFamily:"var(--mono)", fontSize:12, color: value === o ? "var(--accent)" : "var(--text)", borderBottom:"1px solid var(--border)", background: value === o ? "rgba(245,166,35,.08)" : "transparent", display:"flex", alignItems:"center", gap:8 }} onMouseEnter={e => { if (value !== o) e.currentTarget.style.background = "var(--surface2)"; }} onMouseLeave={e => { e.currentTarget.style.background = value === o ? "rgba(245,166,35,.08)" : "transparent"; }}>{value === o && <Icon name="check" size={13} color="var(--accent)" />}{value !== o && <span style={{ width:13 }} />}{o}</div>))}
+              : filtered.map(o => (
+                <div key={o} onClick={() => pick(o)} style={{ padding:"10px 14px", cursor:"pointer", fontFamily:"var(--mono)", fontSize:12, color:value===o?"var(--accent)":"var(--text)", borderBottom:"1px solid var(--border)", background:value===o?"rgba(245,166,35,.08)":"transparent", display:"flex", alignItems:"center", gap:8 }}>
+                  {value===o && <Icon name="check" size={13} color="var(--accent)"/>}{value!==o && <span style={{ width:13 }}/>}{o}
+                </div>
+              ))}
           </div>
         </div>
       )}
@@ -694,9 +604,7 @@ function SelectSearch({ value, onChange, options, placeholder = "Selecionar...",
   );
 }
 
-// ============================================================
-// LOGIN
-// ============================================================
+// ─── LOGIN ───────────────────────────────────────────────────
 function LoginScreen({ onLogin }) {
   const [email, setEmail] = useState(""), [pw, setPw] = useState(""), [loading, setLoading] = useState(false), [err, setErr] = useState("");
   const go = async (e) => {
@@ -720,19 +628,41 @@ function LoginScreen({ onLogin }) {
 }
 
 // ─── SETOR SCREENS ───────────────────────────────────────────
-const SetorCard = ({ s, onClick }) => (
-  <div className="setor-card" style={{ "--c":s.color }} onClick={onClick}>
+const SetorCard = ({ s, onClick, pendentes = 0 }) => (
+  <div className="setor-card" style={{ "--c":s.color, position:"relative" }} onClick={onClick}>
+    {pendentes > 0 && (
+      <span style={{ position:"absolute", top:10, right:10, background:"var(--danger)", color:"#fff", fontFamily:"var(--mono)", fontSize:10, fontWeight:700, width:22, height:22, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:"0 0 0 3px var(--surface)", zIndex:2 }}>
+        {pendentes > 99 ? "99+" : pendentes}
+      </span>
+    )}
     <span style={{ display:"flex", alignItems:"center", justifyContent:"center" }}><Icon name={s.iconName} size={38} color={s.color}/></span>
-    <div><div className="setor-card-name">{s.label}</div><div className="setor-card-sub">Gestão de Estoque</div></div>
+    <div>
+      <div className="setor-card-name">{s.label}</div>
+      <div className="setor-card-sub">{pendentes > 0 ? <span style={{ color:"var(--danger)" }}>{pendentes} pedido{pendentes!==1?"s":""} pendente{pendentes!==1?"s":""}</span> : "Gestão de Estoque"}</div>
+    </div>
   </div>
 );
 
 function SetorScreen({ user, onSelect }) {
+  const [pendMap, setPendMap] = useState({});
+  useEffect(() => {
+    const load = async () => {
+      const map = {};
+      for (const [key, s] of Object.entries(SETORES)) {
+        try {
+          const snap = await getDocs(query(collection(db, `${s.col}_requisicoes`), where("status","==","pendente")));
+          map[key] = snap.size;
+        } catch { map[key] = 0; }
+      }
+      setPendMap(map);
+    };
+    load();
+  }, []);
   return (
     <div className="setor-screen">
       <div className="setor-heading"><h2>SELECIONE O SETOR</h2><p>{user.email}</p></div>
       <div className="setor-cards">
-        {Object.entries(SETORES).map(([key, s]) => <SetorCard key={key} s={s} onClick={() => onSelect(key)}/>)}
+        {Object.entries(SETORES).map(([key, s]) => <SetorCard key={key} s={s} pendentes={pendMap[key]||0} onClick={() => onSelect(key)}/>)}
       </div>
     </div>
   );
@@ -758,13 +688,12 @@ function Dashboard({ setor, products, thresh }) {
   const counts = { total:products.length, itens:products.reduce((a,p)=>a+(p.quantidade||0),0), baixos:withStatus.filter(p=>p._st==="baixo").length, zerados:withStatus.filter(p=>p._st==="zero").length };
   const filtered = (filtro==="todos"?withStatus:withStatus.filter(p=>p._st===filtro))
     .filter(p => !search.trim() || (p.nome||"").toLowerCase().includes(search.toLowerCase()) || (p.categoria||"").toLowerCase().includes(search.toLowerCase()));
-  const suggs = [...new Set([...products.map(p=>p.nome),...products.map(p=>p.categoria)].filter(Boolean))];
   const filterBtns = [
-    { id:"todos", label:"Todos",  dot:"#aaa",           count:counts.total },
-    { id:"alto",  label:"OK",     dot:"var(--success)", count:withStatus.filter(p=>p._st==="alto").length },
-    { id:"medio", label:"Médio",  dot:"var(--warn)",    count:withStatus.filter(p=>p._st==="medio").length },
-    { id:"baixo", label:"Baixo",  dot:"var(--accent)",  count:counts.baixos },
-    { id:"zero",  label:"Zerado", dot:"var(--danger)",  count:counts.zerados },
+    { id:"todos",  label:"Todos",  dot:"#aaa",           count:counts.total },
+    { id:"alto",   label:"OK",     dot:"var(--success)", count:withStatus.filter(p=>p._st==="alto").length },
+    { id:"medio",  label:"Médio",  dot:"var(--warn)",    count:withStatus.filter(p=>p._st==="medio").length },
+    { id:"baixo",  label:"Baixo",  dot:"var(--accent)",  count:counts.baixos },
+    { id:"zero",   label:"Zerado", dot:"var(--danger)",  count:counts.zerados },
   ];
   return (
     <div>
@@ -775,7 +704,7 @@ function Dashboard({ setor, products, thresh }) {
         <div className="stat-card" style={{ "--c":counts.baixos>0?"var(--accent)":"var(--success)" }}><div className="stat-label">Baixo</div><div className="stat-value" style={{ color:counts.baixos>0?"var(--accent)":"var(--success)" }}>{counts.baixos}</div><div className="stat-sub">produtos</div></div>
         <div className="stat-card" style={{ "--c":counts.zerados>0?"var(--danger)":"var(--success)" }}><div className="stat-label">Zerados</div><div className="stat-value" style={{ color:counts.zerados>0?"var(--danger)":"var(--success)" }}>{counts.zerados}</div><div className="stat-sub">produtos</div></div>
       </div>
-      <SearchBox ctx={`dash_${setor}`} value={search} onChange={setSearch} placeholder="Buscar produto ou categoria..." suggestions={suggs} style={{ marginBottom:10 }}/>
+      <SearchBox value={search} onChange={setSearch} placeholder="Buscar produto ou categoria..."/>
       <div className="filter-tabs">
         {filterBtns.map(fb => (
           <button key={fb.id} className={`ftab ${filtro===fb.id?"active":""}`} onClick={() => setFiltro(fb.id)}>
@@ -796,288 +725,11 @@ function Dashboard({ setor, products, thresh }) {
                 <div className="product-card-info"><div className="product-card-name">{p.nome}</div><div className="product-card-cat">{p.categoria}</div></div>
                 <div className="product-card-right">
                   <div className="product-qty" style={{ color:statusColor(p._st) }}>{p.quantidade||0}</div>
-                  <StatusBar qtd={p.quantidade||0} thresh={thresh}/>
-                  {statusLabel(p._st)}
+                  <StatusBar qtd={p.quantidade||0} thresh={thresh}/>{statusLabel(p._st)}
                 </div>
               </div>
             ))}
         </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── CONFIGURAÇÕES ───────────────────────────────────────────
-function DupAlert({ tipo, existente, onScrollTo, onEdit, onDelete, onDismiss }) {
-  return (
-    <div style={{ background:"rgba(250,204,21,.06)", border:"1px solid var(--warn)", borderRadius:"var(--r)", padding:"12px 14px", marginBottom:10 }}>
-      <div style={{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:8, marginBottom:10 }}>
-        <div>
-          <div style={{ fontFamily:"var(--mono)", fontSize:10, color:"var(--warn)", letterSpacing:2, textTransform:"uppercase", marginBottom:3 }}>{tipo==="cat"?"Categoria já existe":"Produto já existe"}</div>
-          <div style={{ fontFamily:"var(--display)", fontSize:18, letterSpacing:1 }}>{existente.nome}</div>
-          {tipo==="prod" && <div style={{ fontFamily:"var(--mono)", fontSize:10, color:"var(--text-dim)", marginTop:2 }}>Categoria: {existente.categoria}</div>}
-        </div>
-        <button onClick={onDismiss} style={{ background:"transparent", border:"none", color:"var(--text-dim)", cursor:"pointer", padding:2 }}><Icon name="x" size={14}/></button>
-      </div>
-      <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
-        <button className="btn btn-outline" style={{ fontSize:10,padding:"7px 10px" }} onClick={onScrollTo}><Icon name="search" size={13}/> Ver existente</button>
-        <button className="btn btn-outline" style={{ fontSize:10,padding:"7px 10px",color:"var(--info)",borderColor:"var(--info)" }} onClick={onEdit}><Icon name="edit" size={13}/> Renomear existente</button>
-        <button className="btn btn-outline" style={{ fontSize:10,padding:"7px 10px",color:"var(--danger)",borderColor:"var(--danger)" }} onClick={onDelete}><Icon name="trash" size={13}/> Excluir existente</button>
-      </div>
-    </div>
-  );
-}
-
-function Configuracoes({ setor, user, addToast, thresh, onThreshChange }) {
-  const colCat = getCol(setor,"categorias"), colPadrao = getCol(setor,"produtos_padrao"), colEst = getCol(setor,"produtos");
-  const [cats, setCats] = useState([]), [prods, setProds] = useState([]), [loading, setLoading] = useState(true);
-  const [nomeCat, setNomeCat] = useState(""), [nomeProd, setNomeProd] = useState(""), [catProd, setCatProd] = useState("");
-  const [localThresh, setLocalThresh] = useState(thresh || DEFAULT_THRESH), [savingThresh, setSavingThresh] = useState(false);
-  const [editCatId, setEditCatId] = useState(null), [editCatVal, setEditCatVal] = useState("");
-  const [editProdId, setEditProdId] = useState(null), [editProdVal, setEditProdVal] = useState("");
-  const [searchCat, setSearchCat] = useState(""), [searchProd, setSearchProd] = useState("");
-  const [dupCat, setDupCat] = useState(null), [dupProd, setDupProd] = useState(null);
-  const [highlightCat, setHighlightCat] = useState(null), [highlightProd, setHighlightProd] = useState(null);
-  // PIN da requisição
-  const [pinReq, setPinReq] = useState(""), [savingPin, setSavingPin] = useState(false), [pinAtual, setPinAtual] = useState("");
-  const catItemRefs = useRef({}), prodItemRefs = useRef({});
-
-  const load = async () => {
-    setLoading(true);
-    try {
-      const [sc, sp] = await Promise.all([getDocs(collection(db,colCat)), getDocs(collection(db,colPadrao))]);
-      setCats(sc.docs.map(d=>({id:d.id,...d.data()}))); setProds(sp.docs.map(d=>({id:d.id,...d.data()})));
-      // Carregar PIN existente
-      const pinDoc = await getDoc(doc(db, getCol(setor,"config"), "requisicao_config"));
-      if (pinDoc.exists()) setPinAtual(pinDoc.data().pin || "");
-    } catch(e) { addToast("Erro: "+e.message,"error"); } finally { setLoading(false); }
-  };
-  useEffect(() => { load(); setLocalThresh(thresh||DEFAULT_THRESH); }, [setor, thresh]);
-  useEffect(() => { const v=nomeCat.trim().toLowerCase(); setDupCat(!v?null:cats.find(c=>c.nome.toLowerCase()===v)||null); }, [nomeCat, cats]);
-  useEffect(() => { const v=nomeProd.trim().toLowerCase(); setDupProd(!v?null:prods.find(p=>p.nome.toLowerCase()===v)||null); }, [nomeProd, prods]);
-
-  const checkEditCatDup = (val,selfId) => cats.find(c=>c.id!==selfId&&c.nome.toLowerCase()===val.trim().toLowerCase())||null;
-  const checkEditProdDup = (val,selfId) => prods.find(p=>p.id!==selfId&&p.nome.toLowerCase()===val.trim().toLowerCase())||null;
-
-  const addCat = async () => {
-    if (!nomeCat.trim()) return;
-    if (dupCat) { addToast(`"${dupCat.nome}" já existe.`,"error"); return; }
-    try { await addDoc(collection(db,colCat),{nome:nomeCat.trim(),criadoEm:new Date().toISOString()}); await registrarLog(setor,"config",{descricao:`Categoria criada: ${nomeCat.trim()}`,usuario:user.email}); addToast("Categoria criada!","success"); setNomeCat(""); setDupCat(null); load(); }
-    catch(e) { addToast("Erro: "+e.message,"error"); }
-  };
-  const delCat = async (c) => {
-    if (!confirm(`Excluir "${c.nome}"?`)) return;
-    try { await deleteDoc(doc(db,colCat,c.id)); addToast("Removida.","success"); load(); }
-    catch(e) { addToast("Erro: "+e.message,"error"); }
-  };
-  const saveCat = async (c) => {
-    const novo = editCatVal.trim();
-    if (!novo||novo===c.nome) { setEditCatId(null); return; }
-    if (checkEditCatDup(novo,c.id)) { addToast("Nome já existe.","error"); return; }
-    try {
-      await updateDoc(doc(db,colCat,c.id),{nome:novo});
-      const sn = await getDocs(query(collection(db,colPadrao),where("categoria","==",c.nome)));
-      await Promise.all(sn.docs.map(d=>updateDoc(doc(db,colPadrao,d.id),{categoria:novo})));
-      const se = await getDocs(query(collection(db,colEst),where("categoria","==",c.nome)));
-      await Promise.all(se.docs.map(d=>updateDoc(doc(db,colEst,d.id),{categoria:novo})));
-      await registrarLog(setor,"config",{descricao:`Categoria: "${c.nome}"→"${novo}"`,usuario:user.email});
-      addToast(`Renomeada para "${novo}"`,"success"); setEditCatId(null); load();
-    } catch(e) { addToast("Erro: "+e.message,"error"); }
-  };
-  const addProd = async () => {
-    if (!nomeProd.trim()||!catProd) { addToast("Preencha nome e categoria.","error"); return; }
-    if (dupProd) { addToast(`"${dupProd.nome}" já existe.`,"error"); return; }
-    try { await addDoc(collection(db,colPadrao),{nome:nomeProd.trim(),categoria:catProd,criadoEm:new Date().toISOString()}); await registrarLog(setor,"config",{descricao:`Produto criado: ${nomeProd.trim()}`,usuario:user.email}); addToast(`"${nomeProd.trim()}" criado!`,"success"); setNomeProd(""); setDupProd(null); load(); }
-    catch(e) { addToast("Erro: "+e.message,"error"); }
-  };
-  const delProd = async (p) => {
-    if (!confirm(`Excluir "${p.nome}"?`)) return;
-    try { await deleteDoc(doc(db,colPadrao,p.id)); addToast("Removido.","success"); load(); }
-    catch(e) { addToast("Erro: "+e.message,"error"); }
-  };
-  const saveProd = async (p) => {
-    const novo = editProdVal.trim();
-    if (!novo||novo===p.nome) { setEditProdId(null); return; }
-    const dup = checkEditProdDup(novo,p.id);
-    if (dup) { addToast(`"${dup.nome}" já existe.`,"error"); return; }
-    try {
-      await updateDoc(doc(db,colPadrao,p.id),{nome:novo});
-      const sn = await getDocs(query(collection(db,colEst),where("nome","==",p.nome)));
-      await Promise.all(sn.docs.map(d=>updateDoc(doc(db,colEst,d.id),{nome:novo})));
-      await registrarLog(setor,"config",{descricao:`Produto: "${p.nome}"→"${novo}"`,usuario:user.email});
-      addToast(`Renomeado para "${novo}"`,"success"); setEditProdId(null); load();
-    } catch(e) { addToast("Erro: "+e.message,"error"); }
-  };
-  const saveThresh = async () => {
-    if (localThresh.baixo>=localThresh.medio) { addToast("'Baixo' deve ser menor que 'Médio'.","error"); return; }
-    setSavingThresh(true);
-    try { await setDoc(doc(db,getCol(setor,"config"),"thresholds"),{...localThresh,updatedAt:new Date().toISOString()}); onThreshChange(localThresh); await registrarLog(setor,"config",{descricao:`Thresholds: baixo≤${localThresh.baixo}, médio≤${localThresh.medio}`,usuario:user.email}); addToast("Limites salvos!","success"); }
-    catch(e) { addToast("Erro: "+e.message,"error"); } finally { setSavingThresh(false); }
-  };
-  const savePinReq = async () => {
-    if (pinReq && (pinReq.length !== 4 || !/^\d{4}$/.test(pinReq))) { addToast("PIN deve ter exatamente 4 dígitos numéricos.","error"); return; }
-    setSavingPin(true);
-    try {
-      await setDoc(doc(db, getCol(setor,"config"), "requisicao_config"), { pin: pinReq || "", updatedAt: new Date().toISOString() });
-      setPinAtual(pinReq);
-      setPinReq("");
-      addToast(pinReq ? `PIN ${pinReq} salvo para ${resolveSetor(setor).label}!` : "PIN removido.","success");
-    } catch(e) { addToast("Erro: "+e.message,"error"); } finally { setSavingPin(false); }
-  };
-
-  const scrollTo = (id, refs, setHL) => {
-    setHL(id); setTimeout(() => { refs.current[id]?.scrollIntoView({ behavior:"smooth", block:"center" }); }, 80);
-    setTimeout(() => setHL(null), 2500);
-  };
-
-  if (loading) return <div className="empty"><span className="spinner"/></div>;
-
-  const InlineEdit = ({ id, val, setId, setVal, onSave, checkDup, onCancel }) => {
-    const dup = checkDup(val, id);
-    return (
-      <div style={{ flex:1, marginRight:6 }}>
-        <div className="inline-edit-row">
-          <input autoFocus value={val} onChange={e=>setVal(e.target.value)} onKeyDown={e=>{if(e.key==="Enter")onSave();if(e.key==="Escape")onCancel();}} style={{ borderColor:dup?"var(--warn)":undefined }}/>
-          <button className="btn-icon-sm" style={{ borderColor:"var(--success)",color:"var(--success)" }} onClick={onSave} disabled={!!dup}><Icon name="check" size={14}/></button>
-          <button className="btn-icon-sm" onClick={onCancel}><Icon name="x" size={14}/></button>
-        </div>
-        {dup && <div style={{ fontFamily:"var(--mono)",fontSize:10,color:"var(--warn)",marginTop:5,display:"flex",alignItems:"center",gap:5 }}><Icon name="x" size={12}/> Nome já existe</div>}
-      </div>
-    );
-  };
-
-  return (
-    <div>
-      <div className="page-hd"><div className="page-title">CONFIG</div><div className="page-sub">Configurações — {resolveSetor(setor).label}</div></div>
-
-      {/* ── PIN Requisição ── */}
-      <div className="card">
-        <div className="card-title">PIN — REQUISIÇÕES</div>
-        <div style={{ fontFamily:"var(--mono)", fontSize:11, color:"var(--text-dim)", marginBottom:14 }}>
-          Senha de 4 dígitos exigida no site de requisições deste setor. Deixe vazio para acesso livre.
-        </div>
-        {pinAtual && (
-          <div style={{ background:"rgba(245,166,35,.06)", border:"1px solid var(--accent)", borderRadius:"var(--r)", padding:"10px 14px", marginBottom:12, display:"flex", alignItems:"center", gap:10 }}>
-            <Icon name="key" size={15} color="var(--accent)"/>
-            <span style={{ fontFamily:"var(--mono)", fontSize:12 }}>PIN atual: <strong style={{ color:"var(--accent)", letterSpacing:4 }}>{pinAtual}</strong></span>
-          </div>
-        )}
-        <div className="pin-cfg-wrap">
-          <input
-            className="pin-cfg-input"
-            type="text"
-            inputMode="numeric"
-            maxLength={4}
-            placeholder="0000"
-            value={pinReq}
-            onChange={e => setPinReq(e.target.value.replace(/\D/g,"").slice(0,4))}
-          />
-          <button className="btn btn-accent" onClick={savePinReq} disabled={savingPin}>
-            {savingPin ? <span className="spinner"/> : <><Icon name="save" size={15}/> {pinReq ? "SALVAR PIN" : "REMOVER PIN"}</>}
-          </button>
-        </div>
-      </div>
-
-      {/* Thresholds */}
-      <div className="card">
-        <div className="card-title">NÍVEIS DE ESTOQUE</div>
-        <div style={{ display:"flex", gap:8, marginBottom:20, flexWrap:"wrap" }}>
-          {[["ZERADO","0","var(--danger)"],["BAIXO",`1–${localThresh.baixo}`,"var(--accent)"],["MÉDIO",`${localThresh.baixo+1}–${localThresh.medio}`,"var(--warn)"],["OK",`${localThresh.medio+1}+`,"var(--success)"]].map(([lbl,val,cor]) => (
-            <div key={lbl} style={{ flex:1,minWidth:80,background:"var(--surface2)",border:`1px solid ${cor}`,borderRadius:"var(--r)",padding:"10px 14px",textAlign:"center" }}>
-              <div style={{ fontFamily:"var(--mono)",fontSize:9,color:cor,letterSpacing:2,marginBottom:4 }}>{lbl}</div>
-              <div style={{ fontFamily:"var(--display)",fontSize:22,color:cor }}>{val}</div>
-            </div>
-          ))}
-        </div>
-        {[["BAIXO ≤","var(--accent)","baixo",50],["MÉDIO ≤","var(--warn)","medio",200]].map(([lbl,cor,key,max]) => (
-          <div key={key} className="thresh-row">
-            <div className="thresh-label" style={{ color:cor }}>{lbl}</div>
-            <input type="range" min={key==="baixo"?1:2} max={max} value={localThresh[key]}
-              onChange={e => setLocalThresh(p => key==="baixo"?{...p,baixo:Math.min(Number(e.target.value),p.medio-1)}:{...p,medio:Math.max(Number(e.target.value),p.baixo+1)})}
-              className="thresh-slider" style={{ background:`linear-gradient(to right,${cor} 0%,${cor} ${(localThresh[key]/max)*100}%,var(--border2) ${(localThresh[key]/max)*100}%,var(--border2) 100%)` }}/>
-            <div className="thresh-val" style={{ color:cor }}>{localThresh[key]}</div>
-          </div>
-        ))}
-        <button className="btn btn-accent btn-full" style={{ marginTop:16 }} onClick={saveThresh} disabled={savingThresh}>
-          {savingThresh?<><span className="spinner"/> SALVANDO...</>:<><Icon name="save" size={15}/> SALVAR LIMITES</>}
-        </button>
-      </div>
-      {/* Categorias */}
-      <div className="card">
-        <div className="card-title">CATEGORIAS</div>
-        <div style={{ display:"flex", gap:8, marginBottom:dupCat?8:10 }}>
-          <input className="form-input" placeholder="Nova categoria..." value={nomeCat} onChange={e=>setNomeCat(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addCat()} style={{ flex:1,borderColor:dupCat?"var(--warn)":undefined }}/>
-          <button className="btn btn-accent" onClick={addCat} disabled={!!dupCat} style={{ padding:"12px 16px",opacity:dupCat?.4:1 }}><Icon name="plus" size={16}/></button>
-        </div>
-        {dupCat && <DupAlert tipo="cat" existente={dupCat} onDismiss={()=>setNomeCat("")} onScrollTo={()=>scrollTo(dupCat.id,catItemRefs,setHighlightCat)} onEdit={()=>{scrollTo(dupCat.id,catItemRefs,setHighlightCat);setTimeout(()=>{setEditCatId(dupCat.id);setEditCatVal(dupCat.nome);},300);setNomeCat("");}} onDelete={()=>{delCat(dupCat);setNomeCat("");}}/>}
-        <SearchBox ctx={`cfg_cat_${setor}`} value={searchCat} onChange={setSearchCat} placeholder="Filtrar categorias..." suggestions={cats.map(c=>c.nome)} style={{ marginBottom:10 }}/>
-        {(() => {
-          const visible = searchCat.trim()?cats.filter(c=>c.nome.toLowerCase().includes(searchCat.toLowerCase())):cats;
-          if (!visible.length) return <div style={{ fontFamily:"var(--mono)",fontSize:11,color:"var(--text-dim)" }}>{cats.length===0?"Nenhuma categoria.":"Nenhuma encontrada."}</div>;
-          return (
-            <div style={{ display:"flex",flexDirection:"column",gap:6 }}>
-              {visible.map(c => (
-                <div key={c.id} ref={el=>catItemRefs.current[c.id]=el}
-                  style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px",background:highlightCat===c.id?"rgba(250,204,21,.08)":"var(--surface2)",border:highlightCat===c.id?"1px solid var(--warn)":"1px solid var(--border)",borderRadius:"var(--r)",transition:"border-color .3s,background .3s" }}>
-                  {editCatId===c.id
-                    ? <InlineEdit id={c.id} val={editCatVal} setId={setEditCatId} setVal={setEditCatVal} onSave={()=>saveCat(c)} checkDup={checkEditCatDup} onCancel={()=>setEditCatId(null)}/>
-                    : <span style={{ fontFamily:"var(--mono)",fontSize:13,flex:1 }}>{c.nome}</span>}
-                  {editCatId!==c.id && <div style={{ display:"flex",gap:4 }}>
-                    <button className="btn-icon-sm edit-btn" onClick={()=>{setEditCatId(c.id);setEditCatVal(c.nome);}}><Icon name="edit" size={14}/></button>
-                    <button className="btn-icon-sm" onClick={()=>delCat(c)}><Icon name="trash" size={14}/></button>
-                  </div>}
-                </div>
-              ))}
-            </div>
-          );
-        })()}
-      </div>
-      {/* Produtos padrão */}
-      <div className="card">
-        <div className="card-title">PRODUTOS PADRÃO</div>
-        <div style={{ display:"flex",flexDirection:"column",gap:8,marginBottom:dupProd?8:10 }}>
-          <select className="form-select" value={catProd} onChange={e=>setCatProd(e.target.value)}>
-            <option value="">Selecionar categoria...</option>
-            {cats.map(c=><option key={c.id} value={c.nome}>{c.nome}</option>)}
-          </select>
-          <div style={{ display:"flex",gap:8 }}>
-            <input className="form-input" placeholder="Nome do produto..." value={nomeProd} onChange={e=>setNomeProd(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addProd()} style={{ flex:1,borderColor:dupProd?"var(--warn)":undefined }}/>
-            <button className="btn btn-accent" onClick={addProd} disabled={!!dupProd} style={{ padding:"12px 16px",opacity:dupProd?.4:1 }}><Icon name="plus" size={16}/></button>
-          </div>
-        </div>
-        {dupProd && <DupAlert tipo="prod" existente={dupProd} onDismiss={()=>setNomeProd("")} onScrollTo={()=>scrollTo(dupProd.id,prodItemRefs,setHighlightProd)} onEdit={()=>{scrollTo(dupProd.id,prodItemRefs,setHighlightProd);setTimeout(()=>{setEditProdId(dupProd.id);setEditProdVal(dupProd.nome);},300);setNomeProd("");}} onDelete={()=>{delProd(dupProd);setNomeProd("");}}/>}
-        <SearchBox ctx={`cfg_prod_${setor}`} value={searchProd} onChange={setSearchProd} placeholder="Filtrar produtos..." suggestions={prods.map(p=>p.nome)} style={{ marginBottom:10 }}/>
-        {(() => {
-          const qp = searchProd.toLowerCase();
-          const fp = qp?prods.filter(p=>p.nome.toLowerCase().includes(qp)||p.categoria.toLowerCase().includes(qp)):prods;
-          if (!fp.length) return <div style={{ fontFamily:"var(--mono)",fontSize:11,color:"var(--text-dim)" }}>{prods.length===0?"Nenhum produto padrão.":"Nenhum encontrado."}</div>;
-          const catsComProds = cats.filter(c=>fp.some(p=>p.categoria===c.nome));
-          return (
-            <div style={{ display:"flex",flexDirection:"column",gap:6,maxHeight:360,overflowY:"auto" }}>
-              {catsComProds.map(c => {
-                const ps = fp.filter(p=>p.categoria===c.nome);
-                if (!ps.length) return null;
-                return (
-                  <div key={c.id}>
-                    <div style={{ fontFamily:"var(--mono)",fontSize:9,color:"var(--text-dim)",letterSpacing:2,textTransform:"uppercase",padding:"8px 0 4px" }}>{c.nome}</div>
-                    {ps.map(p => (
-                      <div key={p.id} ref={el=>prodItemRefs.current[p.id]=el}
-                        style={{ display:"flex",alignItems:"center",justifyContent:"space-between",padding:"9px 12px",background:highlightProd===p.id?"rgba(250,204,21,.08)":"var(--surface2)",border:highlightProd===p.id?"1px solid var(--warn)":"1px solid var(--border)",borderRadius:"var(--r)",marginBottom:4,transition:"border-color .3s,background .3s" }}>
-                        {editProdId===p.id
-                          ? <InlineEdit id={p.id} val={editProdVal} setId={setEditProdId} setVal={setEditProdVal} onSave={()=>saveProd(p)} checkDup={checkEditProdDup} onCancel={()=>setEditProdId(null)}/>
-                          : <span style={{ fontFamily:"var(--mono)",fontSize:12,flex:1 }}>{p.nome}</span>}
-                        {editProdId!==p.id && <div style={{ display:"flex",gap:4 }}>
-                          <button className="btn-icon-sm edit-btn" onClick={()=>{setEditProdId(p.id);setEditProdVal(p.nome);}}><Icon name="edit" size={14}/></button>
-                          <button className="btn-icon-sm" onClick={()=>delProd(p)}><Icon name="trash" size={14}/></button>
-                        </div>}
-                      </div>
-                    ))}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })()}
       </div>
     </div>
   );
@@ -1091,24 +743,20 @@ function Entrada({ setor, onRefresh, addToast, user }) {
   const [quantidade,setQtd]=useState(1), [barcode,setBarcode]=useState("");
   const [scanner,setScanner]=useState(false), [loading,setLoading]=useState(false);
   const [loadData,setLoadData]=useState(true), [existente,setExistente]=useState(null), [dupModal,setDupModal]=useState(null);
-
   useEffect(() => {
     (async () => {
       try { const [sc,sp]=await Promise.all([getDocs(collection(db,colCat)),getDocs(collection(db,colPadrao))]); setCats(sc.docs.map(d=>({id:d.id,...d.data()}))); setPadrao(sp.docs.map(d=>({id:d.id,...d.data()}))); }
       catch(e) { addToast("Erro: "+e.message,"error"); } finally { setLoadData(false); }
     })();
   }, [setor]);
-
   useEffect(() => {
     if (!prodSel) { setExistente(null); return; }
     (async () => {
       try { const s=await getDocs(query(collection(db,colEst),where("nome","==",prodSel))); setExistente(!s.empty?{id:s.docs[0].id,...s.docs[0].data()}:null); } catch {}
     })();
   }, [prodSel]);
-
   const prodsFiltrados = padrao.filter(p=>!catSel||p.categoria===catSel);
   const qtdNum = Math.max(1,parseInt(quantidade)||1);
-
   const onBarcodeScan = async (code) => {
     setScanner(false);
     try {
@@ -1120,13 +768,11 @@ function Entrada({ setor, onRefresh, addToast, user }) {
       } else { setBarcode(code); addToast(`Código: ${code}`,"info"); }
     } catch { setBarcode(code); }
   };
-
   const gerarSemBarras = async () => {
     setLoading(true);
     try { const codigo=await gerarCodigoSemBarras(setor); setBarcode(codigo); addToast(`Código gerado: ${codigo}`,"info"); }
     catch(e) { addToast("Erro: "+e.message,"error"); } finally { setLoading(false); }
   };
-
   const salvar = async () => {
     if (!prodSel) { addToast("Selecione um produto.","error"); return; }
     setLoading(true);
@@ -1143,7 +789,6 @@ function Entrada({ setor, onRefresh, addToast, user }) {
       onRefresh(); setProdSel(""); setBarcode(""); setQtd(1); setExistente(null);
     } catch(e) { addToast("Erro: "+e.message,"error"); } finally { setLoading(false); }
   };
-
   if (loadData) return <div className="empty"><span className="spinner"/></div>;
   return (
     <div>
@@ -1152,17 +797,10 @@ function Entrada({ setor, onRefresh, addToast, user }) {
       <div className="card">
         <div className="card-title">REGISTRAR ENTRADA</div>
         <div className="form-row" style={{ marginBottom:14 }}>
-          <div className="form-group" style={{ margin:0 }}>
-            <SelectSearch label="Categoria" value={catSel} onChange={v => { setCatSel(v); setProdSel(""); }} options={cats.map(c => c.nome)} placeholder="Todas" emptyLabel="Todas as categorias" allowEmpty/>
-          </div>
-          <div className="form-group" style={{ margin:0 }}>
-            <SelectSearch label="Produto *" value={prodSel} onChange={setProdSel} options={prodsFiltrados.map(p => p.nome)} placeholder="Buscar produto..."/>
-          </div>
+          <div className="form-group" style={{ margin:0 }}><SelectSearch label="Categoria" value={catSel} onChange={v=>{setCatSel(v);setProdSel("");}} options={cats.map(c=>c.nome)} placeholder="Todas" emptyLabel="Todas as categorias" allowEmpty/></div>
+          <div className="form-group" style={{ margin:0 }}><SelectSearch label="Produto *" value={prodSel} onChange={setProdSel} options={prodsFiltrados.map(p=>p.nome)} placeholder="Buscar produto..."/></div>
         </div>
-        <div className="form-group" style={{ maxWidth:160 }}>
-          <label className="form-label">Quantidade *</label>
-          <input className="form-input" type="number" inputMode="numeric" min={1} value={quantidade} onChange={e=>setQtd(e.target.value)}/>
-        </div>
+        <div className="form-group" style={{ maxWidth:160 }}><label className="form-label">Quantidade *</label><input className="form-input" type="number" inputMode="numeric" min={1} value={quantidade} onChange={e=>setQtd(e.target.value)}/></div>
         <div className="form-group">
           <label className="form-label">Código de Barras <span style={{ color:"var(--text-dim)",fontWeight:400,marginLeft:6 }}>(opcional)</span></label>
           {barcode
@@ -1197,10 +835,7 @@ function Entrada({ setor, onRefresh, addToast, user }) {
             <div className="dup-modal-title">CÓDIGO EXISTENTE</div>
             <div className="dup-modal-code">Código: {dupModal.code}</div>
             <div style={{ fontFamily:"var(--mono)",fontSize:11,color:"var(--text-dim)",marginBottom:10 }}>Este código já está cadastrado no produto:</div>
-            <div className="dup-modal-product">
-              <div className="dup-modal-pname">{dupModal.produto.nome}</div>
-              <div className="dup-modal-pcat">{dupModal.produto.categoria} · {dupModal.produto.quantidade||0} un. em estoque</div>
-            </div>
+            <div className="dup-modal-product"><div className="dup-modal-pname">{dupModal.produto.nome}</div><div className="dup-modal-pcat">{dupModal.produto.categoria} · {dupModal.produto.quantidade||0} un. em estoque</div></div>
             <div className="dup-modal-btns">
               <button className="btn btn-accent btn-lg btn-full" onClick={()=>{setBarcode(dupModal.code);setProdSel(dupModal.produto.nome);setDupModal(null);addToast(`Código vinculado a "${dupModal.produto.nome}"`,"info");}}><Icon name="check" size={15}/> USAR PRODUTO ORIGINAL ({dupModal.produto.nome})</button>
               <button className="btn btn-outline btn-full" onClick={()=>{setDupModal(null);addToast("Código descartado.","info");}}><Icon name="x" size={15}/> DESCARTAR CÓDIGO</button>
@@ -1213,7 +848,7 @@ function Entrada({ setor, onRefresh, addToast, user }) {
   );
 }
 
-// ─── SAÍDA ───────────────────────────────────────────────────
+// ─── SAÍDA (manual) ──────────────────────────────────────────
 function Saida({ setor, onRefresh, addToast, user }) {
   const colEst=getCol(setor,"produtos"), colCat=getCol(setor,"categorias"), colPadrao=getCol(setor,"produtos_padrao");
   const [pw,setPw]=useState(""), [authOk,setAuthOk]=useState(false), [scanner,setScanner]=useState(false);
@@ -1253,6 +888,8 @@ function Saida({ setor, onRefresh, addToast, user }) {
       else { setFound(null); addToast(`Código "${code}" não encontrado.`,"error"); }
     } catch(e) { addToast("Erro: "+e.message,"error"); } finally { setLoading(false); }
   };
+
+  // ── Saída manual (origin = "manual") ─────────────────────
   const doSaida = async (produto) => {
     const p=produto||found, qtd=Math.max(1,parseInt(qtdSaida)||1);
     if (!p||(p.quantidade||0)<=0) { addToast("Sem estoque!","error"); return; }
@@ -1260,7 +897,8 @@ function Saida({ setor, onRefresh, addToast, user }) {
     setLoading(true);
     try {
       await updateDoc(doc(db,colEst,p.id),{quantidade:increment(-qtd)});
-      await registrarLog(setor,"saida",{produto:p.nome,categoria:p.categoria,quantidade:qtd,usuario:user.email});
+      // Registra como saída manual (sem origem = "manual")
+      await registrarLog(setor,"saida",{produto:p.nome,categoria:p.categoria,quantidade:qtd,usuario:user.email,origem:"manual"});
       addToast(`Saída: ${qtd}x "${p.nome}". Restam ${(p.quantidade||qtd)-qtd} un.`,"success");
       setFound(null); setManual(""); setQtdSaida(1); setProdSel(""); setCatSel(""); setProdEncontrado(null); setAuthOk(false); onRefresh();
     } catch(e) { addToast("Erro: "+e.message,"error"); } finally { setLoading(false); }
@@ -1309,7 +947,10 @@ function Saida({ setor, onRefresh, addToast, user }) {
             </form>
           </div>
         :<div className="card">
-            <div className="card-title">REGISTRAR SAÍDA</div>
+            <div className="card-title">REGISTRAR SAÍDA MANUAL</div>
+            <div style={{ background:"rgba(245,166,35,.06)", border:"1px solid var(--accent)", borderRadius:"var(--r)", padding:"8px 12px", marginBottom:16, fontFamily:"var(--mono)", fontSize:11, color:"var(--text-dim)" }}>
+              ✋ Esta é uma saída <strong style={{ color:"var(--accent)" }}>manual</strong>. Para saídas via requisição, use a aba Pedidos.
+            </div>
             <div style={{ display:"flex",gap:8,marginBottom:20 }}>
               <button className={`btn ${modo==="scanner"?"btn-accent":"btn-outline"}`} style={{ flex:1 }} onClick={()=>{setModo("scanner");setFound(null);setProdSel("");setCatSel("");setProdEncontrado(null);setQtdSaida(1);}}><Icon name="camera" size={15}/> CÓDIGO DE BARRAS</button>
               <button className={`btn ${modo==="sembarras"?"btn-accent":"btn-outline"}`} style={{ flex:1,borderStyle:modo!=="sembarras"?"dashed":"solid",color:modo!=="sembarras"?"var(--info)":undefined,borderColor:modo!=="sembarras"?"var(--info)":undefined }} onClick={entrarSemBarras}><Icon name="tag" size={15}/> SEM BARRAS</button>
@@ -1327,7 +968,6 @@ function Saida({ setor, onRefresh, addToast, user }) {
             {modo==="sembarras"&&(
               loadData?<div className="empty"><span className="spinner"/></div>
               :<>
-                <div style={{ fontFamily:"var(--mono)",fontSize:11,color:"var(--text-dim)",marginBottom:14 }}>Selecione o produto e a quantidade de saída.</div>
                 <div className="form-group"><label className="form-label">Categoria</label>
                   <select className="form-select" value={catSel} onChange={e=>{setCatSel(e.target.value);setProdSel("");setProdEncontrado(null);}}>
                     <option value="">Todas as categorias</option>
@@ -1352,7 +992,6 @@ function Saida({ setor, onRefresh, addToast, user }) {
 function Inventario({ setor, products, onDelete, addToast, thresh }) {
   const colEst=getCol(setor,"produtos");
   const [search,setSearch]=useState(""), [loadId,setLoadId]=useState(null);
-  const suggs=[...new Set([...products.map(p=>p.nome),...products.map(p=>p.categoria)].filter(Boolean))];
   const filtered=products.filter(p=>(p.nome||"").toLowerCase().includes(search.toLowerCase())||(p.categoria||"").toLowerCase().includes(search.toLowerCase())).map(p=>({...p,_st:getStatus(p.quantidade||0,thresh)}));
   const del=async(p)=>{
     if(!confirm(`Excluir "${p.nome}"?`))return;
@@ -1363,7 +1002,7 @@ function Inventario({ setor, products, onDelete, addToast, thresh }) {
   return (
     <div>
       <div className="page-hd"><div className="page-title">INVENTÁRIO</div><div className="page-sub">{products.length} produtos · {resolveSetor(setor).label}</div></div>
-      <SearchBox ctx={`inv_${setor}`} value={search} onChange={setSearch} placeholder="Buscar produto ou categoria..." suggestions={suggs} style={{ marginBottom:12 }}/>
+      <SearchBox value={search} onChange={setSearch} placeholder="Buscar produto ou categoria..."/>
       <div className="table-card">
         <div className="table-card-header"><div className="table-card-title">{filtered.length} produto{filtered.length!==1?"s":""}</div>{search&&<span style={{ fontFamily:"var(--mono)",fontSize:10,color:"var(--accent)" }}>"{search}"</span>}</div>
         <div className="product-list">
@@ -1391,16 +1030,17 @@ function LogCompleto({ setor, addToast }) {
       catch(e){addToast("Erro: "+e.message,"error");}finally{setLoading(false);}
     })();
   },[setor]);
-  const byTipo=filtro==="todos"?logs:logs.filter(l=>l.tipo===filtro);
+
+  const byTipo=filtro==="todos"?logs:filtro==="saida_req"?logs.filter(l=>l.tipo==="saida"&&l.origem==="requisicao"):filtro==="saida_manual"?logs.filter(l=>l.tipo==="saida"&&l.origem!=="requisicao"):logs.filter(l=>l.tipo===filtro);
   const q=search.toLowerCase();
   const filtered=q?byTipo.filter(l=>(l.produto||"").toLowerCase().includes(q)||(l.categoria||"").toLowerCase().includes(q)||(l.descricao||"").toLowerCase().includes(q)||(l.usuario||"").toLowerCase().includes(q)):byTipo;
-  const sugestoes=[...new Set([...logs.map(l=>l.produto),...logs.map(l=>l.categoria)].filter(Boolean))];
+
   return (
     <div>
       <div className="page-hd"><div className="page-title">LOG</div><div className="page-sub">Histórico — {resolveSetor(setor).label}</div></div>
-      <SearchBox ctx={`log_${setor}`} value={search} onChange={setSearch} placeholder="Buscar por produto, categoria, usuário..." suggestions={sugestoes} style={{ marginBottom:10 }}/>
+      <SearchBox value={search} onChange={setSearch} placeholder="Buscar por produto, categoria, usuário..."/>
       <div style={{ display:"flex",gap:6,marginBottom:14,flexWrap:"wrap",alignItems:"center" }}>
-        {[["todos","Todos"],["entrada","Entrada"],["saida","Saída"],["config","Config"]].map(([f,label])=>(
+        {[["todos","Todos"],["entrada","Entrada"],["saida","Saída (todas)"],["saida_req","Saída Req."],["saida_manual","Saída Manual"],["config","Config"]].map(([f,label])=>(
           <button key={f} className={`btn ${filtro===f?"btn-accent":"btn-outline"}`} onClick={()=>setFiltro(f)} style={{ fontSize:11,padding:"8px 12px",textTransform:"uppercase" }}>{label}</button>
         ))}
         <span style={{ fontFamily:"var(--mono)",fontSize:10,color:"var(--text-dim)",alignSelf:"center",marginLeft:4 }}>{filtered.length} reg.</span>
@@ -1409,138 +1049,118 @@ function LogCompleto({ setor, addToast }) {
       <div className="table-card">
         {loading?<div className="empty"><span className="spinner"/></div>:
           filtered.length===0?<div className="empty">Nenhum registro encontrado.</div>:
-          filtered.map(l=>(
-            <div key={l.id} className="log-entry">
-              <div><div className={`log-dot ${l.tipo==="entrada"?"in":l.tipo==="saida"?"out":"config"}`}/></div>
-              <div>
-                <div className="log-action">
-                  {l.tipo==="entrada"&&<><span className="badge badge-in" style={{ marginRight:6 }}>↑</span>{l.quantidade}x {l.produto} {l.barcode&&l.barcode!=="—"&&<span style={{ color:"var(--text-dim)",fontSize:10 }}>· {l.barcode}</span>}</>}
-                  {l.tipo==="saida"&&<><span className="badge badge-out" style={{ marginRight:6 }}>↓</span>{l.quantidade||1}x {l.produto}</>}
-                  {l.tipo==="config"&&<><span className="badge" style={{ marginRight:6,color:"var(--info)",borderColor:"var(--info)" }}>CFG</span>{l.descricao}</>}
+          filtered.map(l=>{
+            const isReq = l.tipo==="saida" && l.origem==="requisicao";
+            return (
+              <div key={l.id} className="log-entry">
+                <div><div className={`log-dot ${l.tipo==="entrada"?"in":isReq?"req":l.tipo==="saida"?"out":"config"}`}/></div>
+                <div>
+                  <div className="log-action">
+                    {l.tipo==="entrada"&&<><span className="badge badge-in" style={{ marginRight:6 }}>↑</span>{l.quantidade}x {l.produto} {l.barcode&&l.barcode!=="—"&&<span style={{ color:"var(--text-dim)",fontSize:10 }}>· {l.barcode}</span>}</>}
+                    {l.tipo==="saida"&&isReq&&<>
+                      <span style={{ marginRight:6, background:"rgba(249,115,22,.12)", border:"1px solid #f97316", color:"#f97316", padding:"2px 6px", fontSize:9, borderRadius:2, fontFamily:"var(--mono)", letterSpacing:1 }}>REQ</span>
+                      {l.quantidade||1}x {l.produto}
+                      {l.reqCodigo && <span style={{ color:"var(--accent)",marginLeft:6,fontSize:10 }}>#{l.reqCodigo}</span>}
+                    </>}
+                    {l.tipo==="saida"&&!isReq&&<><span className="badge badge-out" style={{ marginRight:6 }}>↓</span>{l.quantidade||1}x {l.produto}</>}
+                    {l.tipo==="config"&&<><span className="badge" style={{ marginRight:6,color:"var(--info)",borderColor:"var(--info)" }}>CFG</span>{l.descricao}</>}
+                  </div>
+                  <div className="log-detail">{l.categoria&&`${l.categoria} · `}{l.usuario}{isReq?" · Saída por Requisição":l.tipo==="saida"?" · Saída Manual":""}</div>
                 </div>
-                <div className="log-detail">{l.categoria&&`${l.categoria} · `}{l.usuario}</div>
+                <div className="log-time">{fmtDate(l.ts)}</div>
               </div>
-              <div className="log-time">{fmtDate(l.ts)}</div>
-            </div>
-          ))}
+            );
+          })}
       </div>
-    </div>
-  );
-}
-
-// ─── ANALYTICS ───────────────────────────────────────────────
-function Analytics({ setor, products }) {
-  const [periodo,setPeriodo]=useState("semana"), [logs,setLogs]=useState([]), [loading,setLoading]=useState(true), [search,setSearch]=useState("");
-  useEffect(()=>{
-    (async()=>{
-      setLoading(true);
-      try{const s=await getDocs(query(collection(db,getCol(setor,"log")),where("tipo","==","saida"),orderBy("ts","desc"),limit(500)));setLogs(s.docs.map(d=>({id:d.id,...d.data()})));}
-      catch{setLogs([]);}finally{setLoading(false);}
-    })();
-  },[setor]);
-  const agora=Date.now(), periodos={dia:86400000,semana:604800000,mes:2592000000};
-  const cutoff=agora-(periodos[periodo]||periodos.semana);
-  const logsF=logs.filter(l=>{if(!l.ts)return false;const t=l.ts.toDate?l.ts.toDate().getTime():new Date(l.ts).getTime();return t>=cutoff;});
-  const saidasMap={};
-  logsF.forEach(l=>{const qtd=l.quantidade||1;if(!saidasMap[l.produto])saidasMap[l.produto]={nome:l.produto,cat:l.categoria,total:0};saidasMap[l.produto].total+=qtd;});
-  const topSaidasAll=Object.values(saidasMap).sort((a,b)=>b.total-a.total).slice(0,10);
-  const q=search.toLowerCase();
-  const topSaidas=q?topSaidasAll.filter(item=>item.nome?.toLowerCase().includes(q)||item.cat?.toLowerCase().includes(q)):topSaidasAll;
-  const maxS=(topSaidas[0]?.total||topSaidasAll[0]?.total||1);
-  const totalSaidas=logsF.reduce((a,l)=>a+(l.quantidade||1),0);
-  const dias7=Array.from({length:7},(_,i)=>{const d=new Date(agora-(6-i)*86400000);return{label:d.toLocaleDateString("pt-BR",{weekday:"short"}),ini:new Date(d).setHours(0,0,0,0),fim:new Date(d).setHours(23,59,59,999)};});
-  const grafico=dias7.map(d=>{const total=logs.filter(l=>{if(!l.ts)return false;const t=l.ts.toDate?l.ts.toDate().getTime():new Date(l.ts).getTime();return t>=d.ini&&t<=d.fim;}).reduce((a,l)=>a+(l.quantidade||1),0);return{label:d.label,total};});
-  const maxG=Math.max(...grafico.map(g=>g.total),1);
-  const alertasAll=products.filter(p=>(p.quantidade||0)<=5).sort((a,b)=>(a.quantidade||0)-(b.quantidade||0));
-  const alertas=q?alertasAll.filter(p=>p.nome?.toLowerCase().includes(q)||p.categoria?.toLowerCase().includes(q)):alertasAll;
-  const sugestoes=[...new Set([...products.map(p=>p.nome),...products.map(p=>p.categoria),...topSaidasAll.map(s=>s.nome)].filter(Boolean))];
-  if (loading) return <div className="empty"><span className="spinner"/></div>;
-  return (
-    <div>
-      <div className="page-hd"><div className="page-title">ANALYTICS</div><div className="page-sub">{resolveSetor(setor).label}</div></div>
-      <SearchBox ctx={`analytics_${setor}`} value={search} onChange={setSearch} placeholder="Filtrar por produto ou categoria..." suggestions={sugestoes} style={{ marginBottom:14 }}/>
-      <div className="period-tabs">
-        {[["dia","Hoje"],["semana","Semana"],["mes","Mês"]].map(([k,l])=>(
-          <button key={k} className={`ptab ${periodo===k?"active":""}`} onClick={()=>setPeriodo(k)}>{l}</button>
-        ))}
-      </div>
-      <div className="stats-grid" style={{ marginBottom:18 }}>
-        <div className="stat-card" style={{ "--c":"var(--danger)" }}><div className="stat-label">Saídas (período)</div><div className="stat-value" style={{ color:"var(--danger)" }}>{totalSaidas}</div><div className="stat-sub">unidades</div></div>
-        <div className="stat-card" style={{ "--c":"var(--accent)" }}><div className="stat-label">Produtos Ativos</div><div className="stat-value" style={{ color:"var(--accent)" }}>{products.length}</div><div className="stat-sub">SKUs</div></div>
-        <div className="stat-card" style={{ "--c":"var(--warn)" }}><div className="stat-label">Alertas</div><div className="stat-value" style={{ color:"var(--warn)" }}>{alertasAll.length}</div><div className="stat-sub">estoque baixo</div></div>
-        <div className="stat-card" style={{ "--c":"var(--info)" }}><div className="stat-label">Movimentos</div><div className="stat-value" style={{ color:"var(--info)" }}>{logsF.length}</div><div className="stat-sub">registros</div></div>
-      </div>
-      {!search&&(
-        <div className="table-card" style={{ marginBottom:16 }}>
-          <div className="table-card-header"><div className="table-card-title">SAÍDAS — ÚLTIMOS 7 DIAS</div></div>
-          <div style={{ padding:"16px 12px" }}>
-            <div className="bar-chart">
-              {grafico.map((g,i)=>(
-                <div key={i} className="bar-col">
-                  <div className="bar-val">{g.total||""}</div>
-                  <div className="bar-fill" style={{ height:`${(g.total/maxG)*100}%`,background:"var(--accent)",opacity:g.total?1:.15 }}/>
-                  <div className="bar-label">{g.label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-      <div className="table-card" style={{ marginBottom:16 }}>
-        <div className="table-card-header"><div className="table-card-title">TOP SAÍDAS — {periodo.toUpperCase()}</div>{search&&<span style={{ fontFamily:"var(--mono)",fontSize:10,color:"var(--accent)" }}>"{search}" · {topSaidas.length} result.</span>}</div>
-        {topSaidas.length===0?<div className="empty">{search?`Nenhum resultado para "${search}".`:"Sem saídas no período."}</div>
-          :topSaidas.map((item,i)=>(
-            <div key={item.nome} className="rank-row">
-              <div className={`rank-num ${i===0?"gold":i===1?"silver":i===2?"bronze":""}`}>{i+1}</div>
-              <div className="rank-info"><div className="rank-name">{item.nome}</div><div className="rank-cat">{item.cat}</div></div>
-              <div className="rank-bar-wrap"><div className="rank-bar-track"><div className="rank-bar-fill" style={{ width:`${(item.total/maxS)*100}%` }}/></div><div className="rank-sub">{item.total} un.</div></div>
-              <div className="rank-val">{item.total}</div>
-            </div>
-          ))}
-      </div>
-      {alertas.length>0&&(
-        <div className="table-card">
-          <div className="table-card-header"><div className="table-card-title">ALERTAS DE ESTOQUE BAIXO</div>{search&&<span style={{ fontFamily:"var(--mono)",fontSize:10,color:"var(--accent)" }}>{alertas.length} result.</span>}</div>
-          {alertas.map(p=>(
-            <div key={p.id} className="alert-row">
-              <div className="alert-days" style={{ color:(p.quantidade||0)===0?"var(--danger)":"var(--accent)" }}>{p.quantidade||0}</div>
-              <div className="alert-info"><div className="alert-name">{p.nome}</div><div className="alert-sub">{p.categoria}</div></div>
-              {statusLabel(getStatus(p.quantidade||0,DEFAULT_THRESH))}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
 
 // ============================================================
-// GESTÃO DE REQUISIÇÕES (aba admin)
+// GESTÃO DE REQUISIÇÕES — com saída automática ao marcar "entregue"
 // ============================================================
 const STATUS_REQ = {
-  pendente:  { label:"Pendente",  cls:"req-status-pendente",  badge:"badge-med"  },
-  aprovado:  { label:"Aprovado",  cls:"req-status-aprovado",  badge:"badge-ok"   },
-  recusado:  { label:"Recusado",  cls:"req-status-recusado",  badge:"badge-zero" },
-  entregue:  { label:"Entregue",  cls:"req-status-entregue",  badge:"badge-in"   },
+  pendente: { label:"Pendente",  cls:"req-status-pendente",  badge:"badge-med"  },
+  aprovado: { label:"Aprovado",  cls:"req-status-aprovado",  badge:"badge-ok"   },
+  recusado: { label:"Recusado",  cls:"req-status-recusado",  badge:"badge-zero" },
+  entregue: { label:"Entregue",  cls:"req-status-entregue",  badge:"badge-in"   },
 };
 
-function ReqDetalhe({ req, onClose, onUpdate, addToast }) {
-  const [status, setStatus] = useState(req.status || "pendente");
+function ReqDetalhe({ req, onClose, onUpdate, addToast, user }) {
+  const [status, setStatus]     = useState(req.status || "pendente");
   const [resposta, setResposta] = useState(req.respostaAdmin || "");
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving]     = useState(false);
+  const [preview, setPreview]   = useState(null); // preview da saída que será feita
+
+  // Ao selecionar "entregue", faz preview dos itens
+  useEffect(() => {
+    if (status === "entregue" && req.status !== "entregue") {
+      setPreview(req.itens || []);
+    } else {
+      setPreview(null);
+    }
+  }, [status]);
 
   const salvar = async () => {
     setSaving(true);
+    const wasEntregue = req.status === "entregue";
+    const nowEntregue = status === "entregue";
+
     try {
+      // Atualiza o status da requisição
       await updateDoc(doc(db, getCol(req.setor, "requisicoes"), req.id), {
         status,
         respostaAdmin: resposta.trim(),
         atualizadoEm: serverTimestamp(),
       });
-      addToast("Requisição atualizada!", "success");
+
+      // ── SAÍDA AUTOMÁTICA ao marcar como "entregue" ────────
+      if (nowEntregue && !wasEntregue && req.itens?.length > 0) {
+        const colEst = getCol(req.setor, "produtos");
+        const erros  = [];
+
+        for (const item of req.itens) {
+          const qtd = Number(item.quantidade) || 1;
+          try {
+            // Busca o produto no estoque
+            const snap = await getDocs(query(collection(db, colEst), where("nome", "==", item.nome)));
+            if (!snap.empty) {
+              const prodDoc = snap.docs[0];
+              const estAtual = prodDoc.data().quantidade || 0;
+              const novoEst  = Math.max(0, estAtual - qtd);
+              await updateDoc(doc(db, colEst, prodDoc.id), { quantidade: novoEst });
+
+              // Registra no log como "saida por requisição"
+              await registrarLog(req.setor, "saida", {
+                produto:     item.nome,
+                categoria:   item.categoria || "",
+                quantidade:  qtd,
+                usuario:     user?.email || "sistema",
+                origem:      "requisicao",         // ← marca origem
+                reqCodigo:   req.codigo,
+                reqId:       req.id,
+                solicitante: req.solicitante || "",
+              });
+            } else {
+              erros.push(`"${item.nome}" não encontrado no estoque`);
+            }
+          } catch (e) {
+            erros.push(`Erro em "${item.nome}": ${e.message}`);
+          }
+        }
+
+        if (erros.length > 0) {
+          addToast(`Saída parcial. Erros: ${erros.join("; ")}`, "error");
+        } else {
+          addToast(`✅ Entregue! Saída automática registrada para ${req.itens.length} item(ns).`, "success");
+        }
+      } else {
+        addToast("Requisição atualizada!", "success");
+      }
+
       onUpdate({ ...req, status, respostaAdmin: resposta.trim() });
       onClose();
-    } catch(e) { addToast("Erro: " + e.message, "error"); }
+    } catch (e) { addToast("Erro: " + e.message, "error"); }
     finally { setSaving(false); }
   };
 
@@ -1564,6 +1184,7 @@ function ReqDetalhe({ req, onClose, onUpdate, addToast }) {
             <div style={{ fontFamily:"var(--mono)", fontSize:9, color:"var(--text-dim)", letterSpacing:2, textTransform:"uppercase", marginBottom:4 }}>Solicitante</div>
             <div style={{ fontFamily:"var(--sans)", fontSize:14, fontWeight:600 }}>{req.solicitante}</div>
           </div>
+
           {/* Itens */}
           <div style={{ marginBottom:14 }}>
             <div style={{ fontFamily:"var(--mono)", fontSize:9, color:"var(--text-dim)", letterSpacing:2, textTransform:"uppercase", marginBottom:8 }}>Itens ({req.itens?.length || 0})</div>
@@ -1577,6 +1198,7 @@ function ReqDetalhe({ req, onClose, onUpdate, addToast }) {
               </div>
             ))}
           </div>
+
           {/* Observação */}
           {req.observacao && (
             <div style={{ marginBottom:14, background:"var(--surface2)", border:"1px solid var(--border)", borderRadius:"var(--r)", padding:"10px 14px" }}>
@@ -1584,21 +1206,52 @@ function ReqDetalhe({ req, onClose, onUpdate, addToast }) {
               <div style={{ fontFamily:"var(--mono)", fontSize:12 }}>{req.observacao}</div>
             </div>
           )}
+
           <div className="divider"/>
+
+          {/* Aviso de saída automática */}
+          {status === "entregue" && req.status !== "entregue" && (
+            <div style={{ background:"rgba(74,222,128,.06)", border:"1px solid var(--success)", borderRadius:"var(--r)", padding:"10px 14px", marginBottom:14 }}>
+              <div style={{ fontFamily:"var(--mono)", fontSize:10, color:"var(--success)", letterSpacing:2, marginBottom:4 }}>⚡ SAÍDA AUTOMÁTICA</div>
+              <div style={{ fontFamily:"var(--mono)", fontSize:11, color:"var(--text-dim)" }}>
+                Ao confirmar como <strong style={{ color:"var(--success)" }}>Entregue</strong>, o sistema descontará automaticamente do estoque e registrará no log como <strong style={{ color:"#f97316" }}>Saída por Requisição</strong>.
+              </div>
+              {preview && (
+                <div style={{ marginTop:8 }}>
+                  {preview.map((item, i) => (
+                    <div key={i} style={{ fontFamily:"var(--mono)", fontSize:11, color:"var(--success)", padding:"3px 0" }}>
+                      − {item.quantidade}x {item.nome}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Aviso se já foi entregue */}
+          {req.status === "entregue" && (
+            <div style={{ background:"rgba(96,165,250,.06)", border:"1px solid var(--info)", borderRadius:"var(--r)", padding:"10px 14px", marginBottom:14 }}>
+              <div style={{ fontFamily:"var(--mono)", fontSize:11, color:"var(--info)" }}>
+                ✅ Esta requisição já foi entregue. A saída do estoque já foi registrada automaticamente.
+              </div>
+            </div>
+          )}
+
           {/* Status */}
           <div className="form-group">
             <label className="form-label">Status</label>
             <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
               {Object.entries(STATUS_REQ).map(([k, v]) => (
                 <button key={k} className={`btn ${status===k?"btn-accent":"btn-outline"}`} style={{ fontSize:11, padding:"7px 14px" }} onClick={() => setStatus(k)}>
-                  {v.label}
+                  {k === "entregue" && <Icon name="truck" size={13}/>} {v.label}
                 </button>
               ))}
             </div>
           </div>
+
           {/* Resposta admin */}
           <div className="form-group">
-            <label className="form-label">Resposta / Observação do Admin <span style={{ color:"var(--text-dim)", fontWeight:400 }}>(opcional)</span></label>
+            <label className="form-label">Resposta / Observação <span style={{ color:"var(--text-dim)", fontWeight:400 }}>(opcional)</span></label>
             <textarea
               style={{ width:"100%", background:"var(--surface2)", border:"1px solid var(--border2)", color:"var(--text)", padding:"11px 14px", fontFamily:"var(--mono)", fontSize:13, outline:"none", borderRadius:"var(--r)", resize:"vertical", minHeight:70 }}
               placeholder="Informe prazo, local de entrega, motivo de recusa..."
@@ -1663,130 +1316,90 @@ function GestaoRequisicoes({ setor, user, addToast }) {
         <div className="page-title">REQUISIÇÕES</div>
         <div className="page-sub">Pedidos recebidos — {s.label}</div>
       </div>
-
-      {/* Stats */}
       <div className="stats-grid" style={{ gridTemplateColumns:"repeat(4,1fr)", marginBottom:16 }}>
-        <div className="stat-card" style={{ "--c":"var(--warn)" }}>
-          <div className="stat-label">Pendentes</div>
-          <div className="stat-value" style={{ color:"var(--warn)" }}>{counts.pendente}</div>
-          <div className="stat-sub">aguardando</div>
-        </div>
-        <div className="stat-card" style={{ "--c":"var(--success)" }}>
-          <div className="stat-label">Aprovados</div>
-          <div className="stat-value" style={{ color:"var(--success)" }}>{counts.aprovado}</div>
-          <div className="stat-sub">pedidos</div>
-        </div>
-        <div className="stat-card" style={{ "--c":"var(--info)" }}>
-          <div className="stat-label">Entregues</div>
-          <div className="stat-value" style={{ color:"var(--info)" }}>{counts.entregue}</div>
-          <div className="stat-sub">concluídos</div>
-        </div>
-        <div className="stat-card" style={{ "--c":"var(--danger)" }}>
-          <div className="stat-label">Recusados</div>
-          <div className="stat-value" style={{ color:"var(--danger)" }}>{counts.recusado}</div>
-          <div className="stat-sub">pedidos</div>
-        </div>
+        <div className="stat-card" style={{ "--c":"var(--warn)" }}><div className="stat-label">Pendentes</div><div className="stat-value" style={{ color:"var(--warn)" }}>{counts.pendente}</div><div className="stat-sub">aguardando</div></div>
+        <div className="stat-card" style={{ "--c":"var(--success)" }}><div className="stat-label">Aprovados</div><div className="stat-value" style={{ color:"var(--success)" }}>{counts.aprovado}</div><div className="stat-sub">pedidos</div></div>
+        <div className="stat-card" style={{ "--c":"var(--info)" }}><div className="stat-label">Entregues</div><div className="stat-value" style={{ color:"var(--info)" }}>{counts.entregue}</div><div className="stat-sub">concluídos</div></div>
+        <div className="stat-card" style={{ "--c":"var(--danger)" }}><div className="stat-label">Recusados</div><div className="stat-value" style={{ color:"var(--danger)" }}>{counts.recusado}</div><div className="stat-sub">pedidos</div></div>
       </div>
-
-      <SearchBox
-        ctx={`req_${setor}`}
-        value={search}
-        onChange={setSearch}
-        placeholder="Buscar por código, solicitante ou item..."
-        suggestions={reqs.map(r => r.codigo).concat(reqs.map(r => r.solicitante)).filter(Boolean)}
-        style={{ marginBottom:10 }}
-      />
-
+      <SearchBox value={search} onChange={setSearch} placeholder="Buscar por código, solicitante ou item..."/>
       <div className="filter-tabs">
-        {[
-          ["todos",    "Todos",    "#aaa",            counts.todos    ],
-          ["pendente", "Pendente", "var(--warn)",     counts.pendente ],
-          ["aprovado", "Aprovado", "var(--success)",  counts.aprovado ],
-          ["entregue", "Entregue", "var(--info)",     counts.entregue ],
-          ["recusado", "Recusado", "var(--danger)",   counts.recusado ],
-        ].map(([f, label, dot, cnt]) => (
-          <button key={f} className={`ftab ${filtro===f?"active":""}`} onClick={() => setFiltro(f)}>
-            {filtro!==f && <span className="ftab-dot" style={{ background:dot }}/>}
-            {label} {cnt > 0 && <span style={{ opacity:.7 }}>({cnt})</span>}
+        {[["todos","Todos","#aaa",counts.todos],["pendente","Pendente","var(--warn)",counts.pendente],["aprovado","Aprovado","var(--success)",counts.aprovado],["entregue","Entregue","var(--info)",counts.entregue],["recusado","Recusado","var(--danger)",counts.recusado]].map(([f,label,dot,cnt])=>(
+          <button key={f} className={`ftab ${filtro===f?"active":""}`} onClick={()=>setFiltro(f)}>
+            {filtro!==f&&<span className="ftab-dot" style={{ background:dot }}/>}
+            {label} {cnt>0&&<span style={{ opacity:.7 }}>({cnt})</span>}
           </button>
         ))}
       </div>
-
       <div className="table-card">
         <div className="table-card-header">
           <div className="table-card-title">{filtered.length} requisição{filtered.length!==1?"ões":""}</div>
-          <button className="btn btn-outline" style={{ fontSize:10,padding:"6px 10px" }} onClick={load}>
-            <Icon name="search" size={13}/> Atualizar
-          </button>
+          <button className="btn btn-outline" style={{ fontSize:10,padding:"6px 10px" }} onClick={load}><Icon name="search" size={13}/> Atualizar</button>
         </div>
-        {loading
-          ? <div className="empty"><span className="spinner"/></div>
-          : filtered.length === 0
-            ? <div className="empty">Nenhuma requisição encontrada.</div>
-            : filtered.map(r => {
-                const st = STATUS_REQ[r.status] || STATUS_REQ.pendente;
-                return (
-                  <div key={r.id} className="req-card" onClick={() => setDetalhe(r)}>
-                    <div className="req-card-top">
-                      <div className="req-codigo">{r.codigo}</div>
-                      <div style={{ display:"flex", gap:6, alignItems:"center", flexWrap:"wrap" }}>
-                        <span className={`badge ${st.badge}`}>{st.label}</span>
-                      </div>
+        {loading ? <div className="empty"><span className="spinner"/></div>
+          : filtered.length === 0 ? <div className="empty">Nenhuma requisição encontrada.</div>
+          : filtered.map(r => {
+              const st = STATUS_REQ[r.status] || STATUS_REQ.pendente;
+              return (
+                <div key={r.id} className="req-card" onClick={() => setDetalhe(r)}>
+                  <div className="req-card-top">
+                    <div className="req-codigo">{r.codigo}</div>
+                    <div style={{ display:"flex", gap:6, alignItems:"center", flexWrap:"wrap" }}>
+                      <span className={`badge ${st.badge}`}>{st.label}</span>
                     </div>
-                    <div className="req-meta">{fmtDate(r.criadoEm)} · {r.solicitante}</div>
-                    <div className="req-items-preview">
-                      {r.itens?.map(i => `${i.nome} (${i.quantidade}x)`).join(", ")}
-                    </div>
-                    {r.respostaAdmin && (
-                      <div style={{ fontFamily:"var(--mono)", fontSize:10, color:"var(--info)", marginTop:4 }}>
-                        Admin: {r.respostaAdmin}
-                      </div>
-                    )}
                   </div>
-                );
-              })}
+                  <div className="req-meta">{fmtDate(r.criadoEm)} · {r.solicitante}</div>
+                  <div className="req-items-preview">{r.itens?.map(i => `${i.nome} (${i.quantidade}x)`).join(", ")}</div>
+                  {r.respostaAdmin && <div style={{ fontFamily:"var(--mono)", fontSize:10, color:"var(--info)", marginTop:4 }}>Admin: {r.respostaAdmin}</div>}
+                </div>
+              );
+            })}
       </div>
-
       {detalhe && (
-        <ReqDetalhe
-          req={detalhe}
-          onClose={() => setDetalhe(null)}
-          onUpdate={handleUpdate}
-          addToast={addToast}
-        />
+        <ReqDetalhe req={detalhe} onClose={()=>setDetalhe(null)} onUpdate={handleUpdate} addToast={addToast} user={user}/>
       )}
     </div>
   );
 }
 
 // ============================================================
-// APP
+// APP PRINCIPAL
 // ============================================================
 export default function App() {
-  const [user, setUser]       = useState(null);
-  const [setor, setSetor]     = useState(null);
+  const [user, setUser]           = useState(null);
+  const [setor, setSetor]         = useState(null);
   const [showFerrSub, setShowFerrSub] = useState(false);
-  const [tab, setTab]         = useState("dashboard");
-  const [products, setProducts] = useState([]);
-  const [toasts, setToasts]   = useState([]);
-  const [loadingP, setLoadingP] = useState(false);
-  const [thresh, setThresh]   = useState(DEFAULT_THRESH);
+  const [tab, setTab]             = useState("dashboard");
+  const [products, setProducts]   = useState([]);
+  const [toasts, setToasts]       = useState([]);
+  const [loadingP, setLoadingP]   = useState(false);
+  const [thresh, setThresh]       = useState(DEFAULT_THRESH);
   const [pendingReqs, setPendingReqs] = useState(0);
 
-  const addToast=useCallback((message,type="info")=>{const id=Date.now();setToasts(p=>[...p,{id,message,type}]);setTimeout(()=>setToasts(p=>p.filter(t=>t.id!==id)),3500);},[]);
+  const addToast = useCallback((message, type = "info") => {
+    const id = Date.now();
+    setToasts(p => [...p, { id, message, type }]);
+    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 3500);
+  }, []);
 
-  const loadThresh=useCallback(async(sk)=>{
-    try{const s=await getDocs(collection(db,getCol(sk,"config")));const t=s.docs.find(d=>d.id==="thresholds");if(t)setThresh(t.data());else setThresh(DEFAULT_THRESH);}
-    catch{setThresh(DEFAULT_THRESH);}
-  },[]);
+  const loadThresh = useCallback(async (sk) => {
+    try {
+      const s = await getDocs(collection(db, getCol(sk, "config")));
+      const t = s.docs.find(d => d.id === "thresholds");
+      if (t) setThresh(t.data()); else setThresh(DEFAULT_THRESH);
+    } catch { setThresh(DEFAULT_THRESH); }
+  }, []);
 
-  const loadProducts=useCallback(async(sk)=>{
-    const key=sk||setor;if(!key)return;setLoadingP(true);
-    try{const s=await getDocs(collection(db,getCol(key,"produtos")));setProducts(s.docs.map(d=>({id:d.id,...d.data()})));}
-    catch(e){addToast("Erro: "+e.message,"error");}finally{setLoadingP(false);}
-  },[setor,addToast]);
+  const loadProducts = useCallback(async (sk) => {
+    const key = sk || setor; if (!key) return;
+    setLoadingP(true);
+    try {
+      const s = await getDocs(collection(db, getCol(key, "produtos")));
+      setProducts(s.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch(e) { addToast("Erro: " + e.message, "error"); }
+    finally { setLoadingP(false); }
+  }, [setor, addToast]);
 
-  // Contar requisições pendentes
   const loadPendingReqs = useCallback(async (sk) => {
     if (!sk) return;
     try {
@@ -1795,29 +1408,38 @@ export default function App() {
     } catch { setPendingReqs(0); }
   }, []);
 
-  useEffect(()=>{
-    if(user&&setor){
+  useEffect(() => {
+    if (user && setor) {
       loadProducts(setor);
       loadThresh(setor);
       loadPendingReqs(setor);
     }
-  },[user,setor]);
+  }, [user, setor]);
 
-  const logout=async()=>{await signOut(auth);setUser(null);setSetor(null);setShowFerrSub(false);setTab("dashboard");setProducts([]);setPendingReqs(0);};
-  const selectSetor=(k)=>{if(k==="ferramentas"){setShowFerrSub(true);return;}setSetor(k);setShowFerrSub(false);setTab("dashboard");setProducts([]);setThresh(DEFAULT_THRESH);setPendingReqs(0);};
-  const selectFerrSub=(k)=>{setSetor(k);setShowFerrSub(false);setTab("dashboard");setProducts([]);setThresh(DEFAULT_THRESH);setPendingReqs(0);};
-  const back=()=>{setSetor(null);setShowFerrSub(false);setTab("dashboard");setProducts([]);setPendingReqs(0);};
-  const s=setor?resolveSetor(setor):null;
+  const logout = async () => {
+    await signOut(auth);
+    setUser(null); setSetor(null); setShowFerrSub(false); setTab("dashboard");
+    setProducts([]); setPendingReqs(0);
+  };
+  const selectSetor = (k) => {
+    if (k === "ferramentas") { setShowFerrSub(true); return; }
+    setSetor(k); setShowFerrSub(false); setTab("dashboard"); setProducts([]); setThresh(DEFAULT_THRESH); setPendingReqs(0);
+  };
+  const selectFerrSub = (k) => {
+    setSetor(k); setShowFerrSub(false); setTab("dashboard"); setProducts([]); setThresh(DEFAULT_THRESH); setPendingReqs(0);
+  };
+  const back = () => { setSetor(null); setShowFerrSub(false); setTab("dashboard"); setProducts([]); setPendingReqs(0); };
+  const s = setor ? resolveSetor(setor) : null;
 
   const navItems = [
-    { id:"dashboard",   icon:"home",          label:"Home"     },
-    { id:"entrada",     icon:"arrowUp",        label:"Entrada"  },
-    { id:"saida",       icon:"arrowDown",      label:"Saída"    },
-    { id:"requisicoes", icon:"clipboardList",  label:"Pedidos", badge: pendingReqs > 0 ? pendingReqs : null },
-    { id:"inventario",  icon:"package",        label:"Estoque"  },
-    { id:"analytics",   icon:"barChart",       label:"Analytics"},
-    { id:"log",         icon:"fileText",       label:"Log"      },
-    { id:"config",      icon:"settings",       label:"Config"   },
+    { id:"dashboard",   icon:"home",         label:"Home"     },
+    { id:"entrada",     icon:"arrowUp",       label:"Entrada"  },
+    { id:"saida",       icon:"arrowDown",     label:"Saída"    },
+    { id:"requisicoes", icon:"clipboardList", label:"Pedidos", badge: pendingReqs > 0 ? pendingReqs : null },
+    { id:"inventario",  icon:"package",       label:"Estoque"  },
+    { id:"analytics",   icon:"barChart",      label:"Analytics"},
+    { id:"log",         icon:"fileText",      label:"Log"      },
+    { id:"config",      icon:"settings",      label:"Config"   },
   ];
   const navGroups = [
     { group:"GERAL",     items:[navItems[0]] },
@@ -1826,26 +1448,24 @@ export default function App() {
     { group:"SISTEMA",   items:[navItems[6], navItems[7]] },
   ];
 
-  if (!user) return <><style>{styles}</style><LoginScreen onLogin={setUser} /><Toast toasts={toasts} /></>;
+  if (!user) return <><style>{styles}</style><LoginScreen onLogin={setUser}/><Toast toasts={toasts}/></>;
 
-  if (!setor) {
-    return (
-      <><style>{styles}</style>
-      <div className="app">
-        <header className="header">
-          <div className="header-logo">PARK</div>
-          <div className="header-right">
-            <span className="header-email">{user.email}</span>
-            <button className="hbtn danger" onClick={logout}><Icon name="logout" size={14} /> SAIR</button>
-          </div>
-        </header>
-        {showFerrSub
-          ? <FerramentasSubScreen user={user} onSelect={selectFerrSub} onBack={() => setShowFerrSub(false)} />
-          : <SetorScreen user={user} onSelect={selectSetor} />}
-      </div>
-      <Toast toasts={toasts} /></>
-    );
-  }
+  if (!setor) return (
+    <><style>{styles}</style>
+    <div className="app">
+      <header className="header">
+        <div className="header-logo">PARK</div>
+        <div className="header-right">
+          <span className="header-email">{user.email}</span>
+          <button className="hbtn danger" onClick={logout}><Icon name="logout" size={14}/> SAIR</button>
+        </div>
+      </header>
+      {showFerrSub
+        ? <FerramentasSubScreen user={user} onSelect={selectFerrSub} onBack={() => setShowFerrSub(false)}/>
+        : <SetorScreen user={user} onSelect={selectSetor}/>}
+    </div>
+    <Toast toasts={toasts}/></>
+  );
 
   return (
     <><style>{styles}</style>
@@ -1865,12 +1485,14 @@ export default function App() {
             <div className="sidebar-setor-name" style={{ color:s.color }}><Icon name={s.iconName} size={18} color={s.color}/> {s.label}</div>
           </div>
           <div className="sidebar-nav">
-            {navGroups.map(g=>(
+            {navGroups.map(g => (
               <div key={g.group}>
                 <div className="sidebar-group">{g.group}</div>
-                {g.items.map(item=>(
-                  <div key={item.id} className={`sitem ${tab===item.id?"active":""}`} onClick={()=>{setTab(item.id);if(item.id==="requisicoes")loadPendingReqs(setor);}}>
-                    <span className="sitem-icon"><Icon name={item.icon} size={15}/></span>{item.label}
+                {g.items.map(item => (
+                  <div key={item.id} className={`sitem ${tab===item.id?"active":""}`}
+                    onClick={() => { setTab(item.id); if(item.id==="requisicoes") loadPendingReqs(setor); }}>
+                    <span className="sitem-icon"><Icon name={item.icon} size={15}/></span>
+                    {item.label}
                     {item.badge && <span className="sitem-badge">{item.badge}</span>}
                   </div>
                 ))}
@@ -1880,27 +1502,25 @@ export default function App() {
         </nav>
         <main className="content">
           {loadingP
-            ? <div className="empty"><span className="spinner" style={{ width:28,height:28,borderWidth:3 }} /></div>
+            ? <div className="empty"><span className="spinner" style={{ width:28,height:28,borderWidth:3 }}/></div>
             : <>
-              {tab==="dashboard"   && <Dashboard         setor={setor} products={products} thresh={thresh} />}
-              {tab==="entrada"     && <Entrada           setor={setor} onRefresh={() => loadProducts(setor)} addToast={addToast} user={user} />}
-              {tab==="saida"       && <Saida             setor={setor} onRefresh={() => loadProducts(setor)} addToast={addToast} user={user} />}
-              {tab==="requisicoes" && <GestaoRequisicoes setor={setor} user={user} addToast={addToast} />}
-              {tab==="inventario"  && <Inventario        setor={setor} products={products} onDelete={() => loadProducts(setor)} addToast={addToast} thresh={thresh} />}
-              {tab==="analytics"   && <Analytics         setor={setor} products={products} />}
-              {tab==="log"         && <LogCompleto       setor={setor} addToast={addToast} />}
-              {tab==="config"      && <Configuracoes     setor={setor} user={user} addToast={addToast} thresh={thresh} onThreshChange={t => setThresh(t)} />}
+              {tab==="dashboard"   && <Dashboard         setor={setor} products={products} thresh={thresh}/>}
+              {tab==="entrada"     && <Entrada           setor={setor} onRefresh={()=>loadProducts(setor)} addToast={addToast} user={user}/>}
+              {tab==="saida"       && <Saida             setor={setor} onRefresh={()=>{loadProducts(setor);}} addToast={addToast} user={user}/>}
+              {tab==="requisicoes" && <GestaoRequisicoes setor={setor} user={user} addToast={addToast}/>}
+              {tab==="inventario"  && <Inventario        setor={setor} products={products} onDelete={()=>loadProducts(setor)} addToast={addToast} thresh={thresh}/>}
+              {tab==="analytics"   && <Analytics         setor={setor} products={products}/>}
+              {tab==="log"         && <LogCompleto       setor={setor} addToast={addToast}/>}
+              {tab==="config"      && <Configuracoes     setor={setor} user={user} addToast={addToast} thresh={thresh} onThreshChange={t=>setThresh(t)} resolveSetor={resolveSetor} getCol={getCol} registrarLog={registrarLog} db={db}/>}
             </>}
         </main>
       </div>
       <nav className="bottom-nav">
         <div className="bottom-nav-inner">
-          {navItems.map(item=>(
-            <div key={item.id} className={`bnav-item ${tab===item.id?"active":""}`} onClick={()=>{setTab(item.id);if(item.id==="requisicoes")loadPendingReqs(setor);}}>
-              <span className="bnav-icon">
-                <Icon name={item.icon} size={22}/>
-                {item.badge && <span className="bnav-dot"/>}
-              </span>
+          {navItems.map(item => (
+            <div key={item.id} className={`bnav-item ${tab===item.id?"active":""}`}
+              onClick={() => { setTab(item.id); if(item.id==="requisicoes") loadPendingReqs(setor); }}>
+              <span className="bnav-icon"><Icon name={item.icon} size={22}/>{item.badge && <span className="bnav-dot"/>}</span>
               <span className="bnav-label">{item.label}</span>
             </div>
           ))}
