@@ -185,6 +185,21 @@ const css = `
   .user-btn { padding:11px 10px; cursor:pointer; text-align:left; border-radius:var(--r); font-family:var(--mono); font-size:12px; display:flex; align-items:center; gap:8px; transition:all .15s; background:var(--surface2); border:1px solid var(--border); color:var(--text); -webkit-tap-highlight-color:transparent; }
   .user-btn:hover,.user-btn:active { border-color:var(--accent); }
   .user-btn.selected { background:rgba(245,166,35,.08); border-color:var(--accent); color:var(--accent); }
+
+  /* Adicione isto ao final da variável 'css' */
+.btn-download {
+  text-decoration: none;
+  border-color: var(--success);
+  color: var(--success);
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.btn-download:hover {
+  background: rgba(74, 222, 128, 0.1);
+  border-color: var(--success);
+  color: var(--success);
+}
 `;
 
 // ─── Helpers ─────────────────────────────────────────────────
@@ -438,6 +453,8 @@ function AddItemInline({ setorKey, onAdd, jaAdicionados }) {
   );
 }
 
+
+
 // ─── Formulário ───────────────────────────────────────────────
 function FormRequisicao({ setorKey, setor, onBack, toast }) {
   const [itens, setItens]               = useState([]);
@@ -660,18 +677,27 @@ export default function RequisicaoApp() {
     <>
       <style>{css}</style>
       <div className="req-app">
-        <header className="req-header">
-          <div className="req-logo">PARK</div>
-          <div style={{ display:"flex", gap:6, alignItems:"center" }}>
-            {setor && fase === "form" && (
-              <>
-                <button className={`req-badge ${subTab==="form"?"active":""}`} onClick={() => setSubTab("form")}>Pedido</button>
-                <button className={`req-badge ${subTab==="hist"?"active":""}`} onClick={() => setSubTab("hist")}>Histórico</button>
-              </>
-            )}
-            <span className="req-badge" style={{ cursor:"default" }}>REQ</span>
-          </div>
-        </header>
+      <header className="req-header">
+        <div className="req-logo">PARK</div>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          
+          {/* BOTÃO QUE ENCAMINHA PARA A PASTA BAIXAR */}
+          <a 
+            href="/Baixar/index.html" 
+            className="req-badge btn-download"
+          >
+            📥 APP
+          </a>
+
+          {setor && fase === "form" && (
+            <>
+              <button className={`req-badge ${subTab==="form"?"active":""}`} onClick={() => setSubTab("form")}>Pedido</button>
+              <button className={`req-badge ${subTab==="hist"?"active":""}`} onClick={() => setSubTab("hist")}>Histórico</button>
+            </>
+          )}
+          <span className="req-badge" style={{ cursor: "default" }}>REQ</span>
+        </div>
+      </header>
 
         <div className="req-content">
 
@@ -736,3 +762,4 @@ export default function RequisicaoApp() {
     </>
   );
 }
+

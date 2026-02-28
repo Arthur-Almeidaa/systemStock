@@ -16,3 +16,18 @@ body {
   display: flex;
   flex-direction: column;
 }
+
+/* No seu bloco de CSS */
+.req-badge.download {
+  border-color: var(--success);
+  color: var(--success);
+  font-weight: 600;
+  margin-right: 8px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.req-badge.download:hover {
+  background: rgba(74, 222, 128, 0.1);
+}
