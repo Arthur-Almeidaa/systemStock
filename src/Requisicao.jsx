@@ -1,6 +1,6 @@
 /**
  * REQUISICAO.JSX — Página pública de requisições por setor
- * Fluxo inline: busca produto → seleciona → digita quantidade → ADD → repete
+ * v2 — Sessão persistente por setor + logout com PIN
  */
 
 import { useState, useEffect, useRef } from "react";
@@ -20,6 +20,26 @@ const firebaseConfig = {
 };
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
 const db = getFirestore(app);
+
+// ─── Chave de sessão ─────────────────────────────────────────
+const SESSION_KEY = "req_session_v1";
+
+function saveSession(setorKey) {
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify({ setorKey, ts: Date.now() })); } catch {}
+}
+function loadSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    // Sessão expira em 24h (opcional — remova a condição se quiser permanente)
+    if (Date.now() - s.ts > 24 * 60 * 60 * 1000) { localStorage.removeItem(SESSION_KEY); return null; }
+    return s;
+  } catch { return null; }
+}
+function clearSession() {
+  try { localStorage.removeItem(SESSION_KEY); } catch {}
+}
 
 const SETORES = {
   ti:          { label:"TI",          icon:"🖥️",  color:"#3b82f6", colBase:"estoque_ti"          },
@@ -139,7 +159,7 @@ const css = `
   .prod-stock.warn { color:var(--warn); }
   .prod-stock.zero { color:var(--danger); }
 
-  /* Painel de quantidade — desliza abaixo ao selecionar */
+  /* Painel de quantidade */
   .qty-panel { display:flex; align-items:center; gap:8px; padding:10px 12px; border-top:1px solid var(--accent); background:rgba(245,166,35,.04); flex-wrap:wrap; animation:fadeIn .15s; }
   @keyframes fadeIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:translateY(0)} }
   .qty-name { flex:1; min-width:110px; font-family:var(--sans); font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -186,34 +206,19 @@ const css = `
   .user-btn:hover,.user-btn:active { border-color:var(--accent); }
   .user-btn.selected { background:rgba(245,166,35,.08); border-color:var(--accent); color:var(--accent); }
 
-  /* Adicione isto ao final da variável 'css' */
-.btn-download {
-  text-decoration: none;
-  border-color: var(--success);
-  color: var(--success);
-  font-weight: 600;
-  margin-right: 4px;
-}
+  .btn-download { text-decoration:none; border-color:var(--success); color:var(--success); font-weight:600; margin-right:4px; }
+  .btn-download:hover { background:rgba(74,222,128,.1); }
+  .btn-ios { text-decoration:none; border-color:var(--danger); color:var(--danger); font-weight:600; }
+  .btn-ios:hover { background:rgba(248,113,113,.1); }
 
-.btn-download:hover {
-  background: rgba(74, 222, 128, 0.1);
-  border-color: var(--success);
-  color: var(--success);
-}
-  
-/* Estilo para o botão iOS (Vermelho) */
-.btn-ios {
-  text-decoration: none;
-  border-color: var(--danger);
-  color: var(--danger);
-  font-weight: 600;
-}
+  /* Sair modal */
+  .logout-overlay { position:fixed; inset:0; background:rgba(0,0,0,.8); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .logout-box { background:var(--surface); border:1px solid var(--border2); border-radius:var(--r); padding:24px 20px; width:100%; max-width:340px; }
+  .logout-title { font-family:var(--display); font-size:22px; letter-spacing:3px; color:var(--danger); margin-bottom:4px; }
+  .logout-sub { font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-bottom:20px; }
 
-.btn-ios:hover {
-  background: rgba(248, 113, 113, 0.1);
-  border-color: var(--danger);
-}
-
+  /* Setor indicator no header */
+  .setor-pill { font-family:var(--mono); font-size:10px; letter-spacing:1px; padding:3px 8px; border-radius:20px; border:1px solid; font-weight:600; }
 `;
 
 // ─── Helpers ─────────────────────────────────────────────────
@@ -239,8 +244,8 @@ const ToastEl = ({ toasts }) => (
   </div>
 );
 
-// ─── PIN ─────────────────────────────────────────────────────
-function PinScreen({ setor, setorKey, onSuccess }) {
+// ─── PIN (genérico — login ou logout) ────────────────────────
+function PinScreen({ setor, setorKey, mode = "login", onSuccess, onCancel }) {
   const [pin, setPin]     = useState("");
   const [err, setErr]     = useState("");
   const [shake, setShake] = useState(false);
@@ -252,23 +257,42 @@ function PinScreen({ setor, setorKey, onSuccess }) {
     setLoading(true);
     try {
       const snap = await getDoc(doc(db, getCol(setorKey, "config"), "requisicao_config"));
-      if (!snap.exists() || !snap.data().pin || snap.data().pin === pin) { onSuccess(); return; }
-      setShake(true);
-      setErr("Senha incorreta.");
-      setTimeout(() => { setPin(""); setShake(false); setErr(""); }, 900);
-    } catch { onSuccess(); }
-    finally { setLoading(false); }
+      if (!snap.exists() || !snap.data().pin || snap.data().pin === pin) {
+        onSuccess();
+        return;
+      }
+      wrong();
+    } catch {
+      // Se der erro ao buscar config, permite entrar/sair
+      onSuccess();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const wrong = () => {
+    setShake(true);
+    setErr(mode === "logout" ? "Senha incorreta. Não é possível sair." : "Senha incorreta.");
+    setTimeout(() => { setPin(""); setShake(false); setErr(""); }, 900);
   };
 
   const press = (d) => { if (pin.length < 4 && !loading) setPin(p => p + d); };
   const del   = () => setPin(p => p.slice(0, -1));
   const digits = [1,2,3,4,5,6,7,8,9,null,0,"del"];
 
+  const isLogout = mode === "logout";
+
   return (
     <div className="pin-wrap">
       <div className="page-hd">
-        <div className="page-title" style={{ color: setor.color }}>{setor.label}</div>
-        <div className="page-sub">Digite a senha de acesso</div>
+        <div className="page-title" style={{ color: isLogout ? "var(--danger)" : setor.color }}>
+          {isLogout ? "SAIR" : setor.label}
+        </div>
+        <div className="page-sub">
+          {isLogout
+            ? `Confirme a senha do setor ${setor.label} para sair`
+            : "Digite a senha de acesso"}
+        </div>
       </div>
       <div className="pin-display">
         {[0,1,2,3].map(i => <div key={i} className={`pin-dot ${pin.length>i?(shake?"error":"filled"):""}`}/>)}
@@ -281,6 +305,30 @@ function PinScreen({ setor, setorKey, onSuccess }) {
         })}
       </div>
       <div className="pin-err">{err}</div>
+      {onCancel && (
+        <div style={{ textAlign:"center", marginTop:10 }}>
+          <button className="btn btn-outline" style={{ width:"100%" }} onClick={onCancel}>Cancelar</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Modal de Logout ──────────────────────────────────────────
+function LogoutModal({ setor, setorKey, onConfirm, onCancel }) {
+  return (
+    <div className="logout-overlay" onClick={e => e.target===e.currentTarget && onCancel()}>
+      <div className="logout-box">
+        <div className="logout-title">SAIR DO SETOR</div>
+        <div className="logout-sub">Digite a senha para confirmar a saída</div>
+        <PinScreen
+          setor={setor}
+          setorKey={setorKey}
+          mode="logout"
+          onSuccess={onConfirm}
+          onCancel={onCancel}
+        />
+      </div>
     </div>
   );
 }
@@ -316,7 +364,6 @@ function AddItemInline({ setorKey, onAdd, jaAdicionados }) {
     })();
   }, [setorKey]);
 
-  // Foca no input de quantidade ao selecionar produto
   useEffect(() => {
     if (sel) setTimeout(() => qtdRef.current?.select(), 60);
   }, [sel?.id]);
@@ -356,7 +403,6 @@ function AddItemInline({ setorKey, onAdd, jaAdicionados }) {
 
   return (
     <div className="add-panel">
-      {/* Busca */}
       <div className="search-row">
         <span style={{ fontSize:14, color:"var(--text-dim)" }}>🔍</span>
         <input
@@ -371,13 +417,10 @@ function AddItemInline({ setorKey, onAdd, jaAdicionados }) {
         />
         {busca && (
           <button className="btn-ghost" style={{ padding:"2px 4px", fontSize:11 }}
-            onClick={() => { setBusca(""); setSel(null); inputRef.current?.focus(); }}>
-            ✕
-          </button>
+            onClick={() => { setBusca(""); setSel(null); inputRef.current?.focus(); }}>✕</button>
         )}
       </div>
 
-      {/* Filtro de categorias */}
       {cats.length > 1 && (
         <div className="cat-strip">
           {[{ id:"__all", nome:"Todos" }, ...cats].map(c => {
@@ -392,7 +435,6 @@ function AddItemInline({ setorKey, onAdd, jaAdicionados }) {
         </div>
       )}
 
-      {/* Lista */}
       <div className="prod-list">
         {filtrados.length === 0
           ? <div className="empty" style={{ padding:"14px 12px" }}>
@@ -421,7 +463,6 @@ function AddItemInline({ setorKey, onAdd, jaAdicionados }) {
             })}
       </div>
 
-      {/* Painel de quantidade — aparece ao selecionar */}
       {sel && (
         <div className="qty-panel">
           <div className="qty-name">{sel.nome}</div>
@@ -453,12 +494,9 @@ function AddItemInline({ setorKey, onAdd, jaAdicionados }) {
           >
             + ADD
           </button>
-          {/* Aviso de estoque */}
           {estoque !== null && (
             <div className={`qty-msg ${excede?"over":"ok"}`}>
-              {excede
-                ? `⚠ Disponível: ${estoque} un.`
-                : `✓ ${estoque} em estoque`}
+              {excede ? `⚠ Disponível: ${estoque} un.` : `✓ ${estoque} em estoque`}
             </div>
           )}
         </div>
@@ -466,8 +504,6 @@ function AddItemInline({ setorKey, onAdd, jaAdicionados }) {
     </div>
   );
 }
-
-
 
 // ─── Formulário ───────────────────────────────────────────────
 function FormRequisicao({ setorKey, setor, onBack, toast }) {
@@ -503,8 +539,8 @@ function FormRequisicao({ setorKey, setor, onBack, toast }) {
   const remover = (idx) => setItens(p => p.filter((_, i) => i !== idx));
 
   const enviar = async () => {
-    if (itens.length === 0)      { toast("Adicione pelo menos um item.", "error"); return; }
-    if (!solicitante.trim())     { toast("Informe quem está pedindo.", "error");   return; }
+    if (itens.length === 0)  { toast("Adicione pelo menos um item.", "error"); return; }
+    if (!solicitante.trim()) { toast("Informe quem está pedindo.", "error");   return; }
     setLoading(true);
     try {
       const codigo = genCodigo();
@@ -529,7 +565,7 @@ function FormRequisicao({ setorKey, setor, onBack, toast }) {
         <div className="success-sub">Código:</div>
         <div className="success-code">{enviado}</div>
         <div style={{ marginTop:24 }}>
-          <button className="btn btn-outline btn-lg" onClick={onBack}>NOVA REQUISIÇÃO</button>
+          <button className="btn btn-outline btn-lg" onClick={() => setEnviado(null)}>NOVA REQUISIÇÃO</button>
         </div>
       </div>
     </div>
@@ -545,7 +581,6 @@ function FormRequisicao({ setorKey, setor, onBack, toast }) {
       <div className="card">
         <div className="card-title">NOVA REQUISIÇÃO</div>
 
-        {/* Solicitante */}
         <div style={{ marginBottom:16 }}>
           <label className="form-label">Quem está pedindo? *</label>
           {loadingUsers
@@ -570,7 +605,6 @@ function FormRequisicao({ setorKey, setor, onBack, toast }) {
 
         <div className="divider"/>
 
-        {/* Lista de itens adicionados */}
         {itens.length > 0 && (
           <div style={{ marginBottom:12 }}>
             <label className="form-label" style={{ marginBottom:8 }}>
@@ -591,7 +625,6 @@ function FormRequisicao({ setorKey, setor, onBack, toast }) {
           </div>
         )}
 
-        {/* Painel de busca inline */}
         <label className="form-label" style={{ marginBottom:8, display:"block" }}>
           {itens.length === 0 ? "Adicionar itens *" : "Adicionar mais itens"}
         </label>
@@ -599,7 +632,6 @@ function FormRequisicao({ setorKey, setor, onBack, toast }) {
 
         <div className="divider"/>
 
-        {/* Observações */}
         <div style={{ marginBottom:14 }}>
           <label className="form-label">Observações <span style={{ color:"var(--text-dim)", fontWeight:400 }}>(opcional)</span></label>
           <textarea className="form-textarea"
@@ -623,8 +655,8 @@ function FormRequisicao({ setorKey, setor, onBack, toast }) {
 
 // ─── Histórico ───────────────────────────────────────────────
 function HistoricoRequisicoes({ setorKey, setor }) {
-  const [reqs, setReqs]         = useState([]);
-  const [loading, setLoading]   = useState(true);
+  const [reqs, setReqs]       = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -669,49 +701,88 @@ function HistoricoRequisicoes({ setorKey, setor }) {
 
 // ─── APP ─────────────────────────────────────────────────────
 export default function RequisicaoApp() {
-  const [fase, setFase]           = useState("setores");
-  const [setorKey, setSetorKey]   = useState(null);
-  const [subTab, setSubTab]       = useState("form");
-  const { toasts, add: toast }    = useToast();
+  // Inicializa a partir da sessão salva
+  const [setorKey, setSetorKey]     = useState(() => loadSession()?.setorKey ?? null);
+  const [fase, setFase]             = useState(() => loadSession()?.setorKey ? "form" : "setores");
+  const [subTab, setSubTab]         = useState("form");
+  const [showLogout, setShowLogout] = useState(false);
+  const { toasts, add: toast }      = useToast();
 
   const setor = setorKey ? ALL_SETORES[setorKey] : null;
 
+  // ── Selecionar setor → PIN → salva sessão ──────────────────
   const selecionarSetor = (key) => {
     if (key === "ferramentas") { setFase("ferramentas"); return; }
-    setSetorKey(key); setFase("pin");
+    setSetorKey(key);
+    setFase("pin");
   };
 
-  const voltar = () => {
+  const onPinSuccess = () => {
+    saveSession(setorKey);        // ← persiste a sessão
+    setFase("form");
+    toast(`Setor ${ALL_SETORES[setorKey].label} selecionado`, "success");
+  };
+
+  // ── Logout ─────────────────────────────────────────────────
+  const handleLogout = () => {
+    clearSession();
+    setSetorKey(null);
+    setFase("setores");
+    setSubTab("form");
+    setShowLogout(false);
+    toast("Sessão encerrada", "info");
+  };
+
+  const voltarPin = () => {
     if (fase === "ferramentas") { setFase("setores"); setSetorKey(null); }
     else if (fase === "pin")    { setFase(setorKey in FERRAMENTAS_SUB ? "ferramentas" : "setores"); setSetorKey(null); }
-    else if (fase === "form")   { setFase("setores"); setSetorKey(null); setSubTab("form"); }
   };
 
   return (
     <>
       <style>{css}</style>
       <div className="req-app">
-      <header className="req-header">
-        <div className="req-logo">PARK</div>
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          
-          {/* BOTÃO ANDROID (VERDE) */}
-          <a href="/Baixar/user.html" className="req-badge btn-download">
-             APP USER Android
-          </a>
 
-          {setor && fase === "form" && (
-            <>
-              <button className={`req-badge ${subTab==="form"?"active":""}`} onClick={() => setSubTab("form")}>Pedido</button>
-              <button className={`req-badge ${subTab==="hist"?"active":""}`} onClick={() => setSubTab("hist")}>Histórico</button>
-            </>
-          )}
-          <span className="req-badge" style={{ cursor: "default" }}>REQ</span>
-        </div>
-</header>
+        {/* ── Header ── */}
+        <header className="req-header">
+          <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+            <div className="req-logo">PARK</div>
+            {/* Indicador do setor logado */}
+            {setor && fase === "form" && (
+              <span className="setor-pill" style={{ color:setor.color, borderColor:setor.color }}>
+                {setor.icon} {setor.label}
+              </span>
+            )}
+          </div>
+
+          <div style={{ display:"flex", gap:6, alignItems:"center" }}>
+            <a href="/Baixar/user.html" className="req-badge btn-download">APP USER Android</a>
+
+            {setor && fase === "form" && (
+              <>
+                <button className={`req-badge ${subTab==="form"?"active":""}`} onClick={() => setSubTab("form")}>Pedido</button>
+                <button className={`req-badge ${subTab==="hist"?"active":""}`} onClick={() => setSubTab("hist")}>Histórico</button>
+                {/* Botão Sair */}
+                <button
+                  className="req-badge"
+                  style={{ borderColor:"var(--danger)", color:"var(--danger)" }}
+                  onClick={() => setShowLogout(true)}
+                >
+                  Sair
+                </button>
+              </>
+            )}
+
+            {(!setor || fase !== "form") && (
+              <span className="req-badge" style={{ cursor:"default" }}>REQ</span>
+            )}
+          </div>
+        </header>
+
+        {/* ── Conteúdo ── */}
         <div className="req-content">
 
-          {/* Setores */}
+          {/* Seleção de setores */}
           {fase === "setores" && (
             <>
               <div className="page-hd">
@@ -749,27 +820,41 @@ export default function RequisicaoApp() {
             </>
           )}
 
-          {/* PIN */}
-          {fase === "pin" && setor && (
+          {/* PIN de entrada */}
+          {fase === "pin" && setorKey && (
             <>
-              <button className="back-btn" onClick={voltar}>← Voltar</button>
-              <PinScreen setor={setor} setorKey={setorKey} onSuccess={() => setFase("form")}/>
+              <button className="back-btn" onClick={voltarPin}>← Voltar</button>
+              <PinScreen
+                setor={ALL_SETORES[setorKey]}
+                setorKey={setorKey}
+                mode="login"
+                onSuccess={onPinSuccess}
+              />
             </>
           )}
 
           {/* Formulário / Histórico */}
           {fase === "form" && setor && (
             <>
-              <button className="back-btn" onClick={voltar}>← Trocar Setor</button>
-              {subTab === "form" && <FormRequisicao setorKey={setorKey} setor={setor} onBack={voltar} toast={toast}/>}
+              {subTab === "form" && <FormRequisicao setorKey={setorKey} setor={setor} onBack={() => {}} toast={toast}/>}
               {subTab === "hist" && <HistoricoRequisicoes setorKey={setorKey} setor={setor}/>}
             </>
           )}
 
         </div>
       </div>
+
+      {/* Modal de Logout com PIN */}
+      {showLogout && setor && (
+        <LogoutModal
+          setor={setor}
+          setorKey={setorKey}
+          onConfirm={handleLogout}
+          onCancel={() => setShowLogout(false)}
+        />
+      )}
+
       <ToastEl toasts={toasts}/>
     </>
   );
 }
-
