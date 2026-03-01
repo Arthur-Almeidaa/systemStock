@@ -1450,12 +1450,23 @@ export default function App() {
 
   if (!user) return <><style>{styles}</style><LoginScreen onLogin={setUser}/><Toast toasts={toasts}/></>;
 
-  if (!setor) return (
+ if (!setor) return (
     <><style>{styles}</style>
     <div className="app">
       <header className="header">
         <div className="header-logo">PARK</div>
         <div className="header-right">
+
+          {/* ADM VERDE */}
+          <a href="/Baixar/index804521.html" className="hbtn" style={{ textDecoration:"none", borderColor:"var(--success)", color:"var(--success)" }}>
+            ⬇ APP ADM
+          </a>
+
+          {/*USER VERMELHO */}
+          <a href="/Baixar/user.html" className="hbtn" style={{ textDecoration:"none", borderColor:"var(--danger)", color:"var(--danger)" }}>
+            ⬇ App USER
+          </a>
+
           <span className="header-email">{user.email}</span>
           <button className="hbtn danger" onClick={logout}><Icon name="logout" size={14}/> SAIR</button>
         </div>

@@ -696,13 +696,8 @@ export default function RequisicaoApp() {
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           
           {/* BOTÃO ANDROID (VERDE) */}
-          <a href="/Baixar/index.html" className="req-badge btn-download">
-             APP Android
-          </a>
-
-          {/* NOVO BOTÃO IOS (VERMELHO) */}
-          <a href="/Baixar/ios.html" className="req-badge btn-ios">
-             APP IOS
+          <a href="/Baixar/user.html" className="req-badge btn-download">
+             APP USER Android
           </a>
 
           {setor && fase === "form" && (
