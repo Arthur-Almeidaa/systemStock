@@ -68,7 +68,6 @@ const Icon = ({ name, size = 18, color = "currentColor", style = {} }) => {
 const SETORES = {
   ti:          { label:"TI",          iconName:"monitor",  color:"#3b82f6", col:"estoque_ti"          },
   exfood:      { label:"X-food",      iconName:"utensils", color:"#f5a623", col:"estoque_exfood"      },
-  bilheteria:  { label:"Bilheteria",  iconName:"tag",      color:"#ec4899", col:"estoque_exfood"      },
   limpeza:     { label:"Limpeza",     iconName:"sparkles", color:"#52c41a", col:"estoque_limpeza"     },
   ferramentas: { label:"Ferramentas", iconName:"tools",    color:"#a855f7", col:"estoque_ferramentas" },
 };
@@ -157,15 +156,14 @@ const styles = `
   .setor-heading { text-align:center; }
   .setor-heading h2 { font-family:var(--display); font-size:36px; letter-spacing:4px; margin-bottom:6px; }
   .setor-heading p { font-family:var(--mono); font-size:11px; color:var(--text-dim); }
-  .setor-cards { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; width:100%; max-width:1100px; }
+  .setor-cards { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; width:100%; max-width:900px; }
   .setor-card { background:var(--surface); border:1px solid var(--border); padding:32px 12px; cursor:pointer; transition:all .25s; display:flex; flex-direction:column; align-items:center; gap:12px; position:relative; overflow:hidden; -webkit-tap-highlight-color:transparent; }
   .setor-card::after { content:''; position:absolute; bottom:0; left:0; right:0; height:3px; opacity:0; transition:opacity .25s; background:var(--c); }
   .setor-card:hover,.setor-card:active { transform:translateY(-4px); border-color:var(--c); }
   .setor-card:hover::after,.setor-card:active::after { opacity:1; }
   .setor-card-name { font-family:var(--display); font-size:22px; letter-spacing:2px; color:var(--c); }
   .setor-card-sub { font-family:var(--mono); font-size:9px; color:var(--text-dim); letter-spacing:1px; }
-  @media (max-width:900px) { .setor-cards { grid-template-columns:repeat(3,1fr); max-width:600px; } }
-  @media (max-width:600px) { .setor-cards { grid-template-columns:repeat(2,1fr); max-width:440px; } }
+  @media (max-width:700px) { .setor-cards { grid-template-columns:repeat(2,1fr); max-width:440px; } }
   @media (max-width:400px) { .setor-cards { grid-template-columns:1fr; max-width:320px; } .setor-card { flex-direction:row; padding:18px; gap:14px; align-items:center; } }
   .ferr-sub-cards { display:grid; grid-template-columns:1fr 1fr; gap:14px; width:100%; max-width:500px; }
   @media (max-width:400px) { .ferr-sub-cards { grid-template-columns:1fr; } }
@@ -1282,7 +1280,6 @@ function GestaoRequisicoes({ setor, user, addToast }) {
     try {
       const s = await getDocs(query(
         collection(db, getCol(setor, "requisicoes")),
-        where("setor", "==", setor),
         orderBy("criadoEm", "desc"),
         limit(100)
       ));
@@ -1406,7 +1403,7 @@ export default function App() {
   const loadPendingReqs = useCallback(async (sk) => {
     if (!sk) return;
     try {
-      const s = await getDocs(query(collection(db, getCol(sk, "requisicoes")), where("setor","==",sk), where("status","==","pendente")));
+      const s = await getDocs(query(collection(db, getCol(sk, "requisicoes")), where("status","==","pendente")));
       setPendingReqs(s.size);
     } catch { setPendingReqs(0); }
   }, []);

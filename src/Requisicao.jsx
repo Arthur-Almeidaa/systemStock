@@ -44,7 +44,6 @@ function clearSession() {
 const SETORES = {
   ti:          { label:"TI",          icon:"🖥️",  color:"#3b82f6", colBase:"estoque_ti"          },
   exfood:      { label:"X-food",      icon:"🍽️",  color:"#f5a623", colBase:"estoque_exfood"      },
-  bilheteria:  { label:"Bilheteria",  icon:"🎟️",  color:"#ec4899", colBase:"estoque_exfood"      },
   limpeza:     { label:"Limpeza",     icon:"✨",  color:"#52c41a", colBase:"estoque_limpeza"     },
   ferramentas: { label:"Ferramentas", icon:"🔧",  color:"#a855f7", colBase:"estoque_ferramentas" },
 };
@@ -54,8 +53,6 @@ const FERRAMENTAS_SUB = {
 };
 const ALL_SETORES = { ...SETORES, ...FERRAMENTAS_SUB };
 const getCol = (k, t) => `${ALL_SETORES[k].colBase}_${t}`;
-// Coleções exclusivas do setor (não compartilhadas): req_usuarios, config de PIN
-const getColPrivate = (k, t) => `estoque_${k}_${t}`;
 
 // ─── CSS ─────────────────────────────────────────────────────
 const css = `
@@ -82,8 +79,7 @@ const css = `
   .req-content { flex:1; padding:24px 16px; max-width:600px; margin:0 auto; width:100%; }
 
   .setor-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; margin-top:20px; }
-  @media(min-width:480px){ .setor-grid { grid-template-columns:repeat(3,1fr); } }
-  @media(min-width:700px){ .setor-grid { grid-template-columns:repeat(5,1fr); } }
+  @media(min-width:480px){ .setor-grid { grid-template-columns:repeat(4,1fr); } }
   .setor-card { background:var(--surface); border:1px solid var(--border); padding:22px 12px; cursor:pointer; transition:all .2s; display:flex; flex-direction:column; align-items:center; gap:8px; position:relative; overflow:hidden; border-radius:var(--r); -webkit-tap-highlight-color:transparent; }
   .setor-card::after { content:''; position:absolute; bottom:0; left:0; right:0; height:2px; opacity:0; transition:opacity .2s; background:var(--c,var(--accent)); }
   .setor-card:hover::after,.setor-card:active::after { opacity:1; }
@@ -260,7 +256,7 @@ function PinScreen({ setor, setorKey, mode = "login", onSuccess, onCancel }) {
   const verify = async () => {
     setLoading(true);
     try {
-      const snap = await getDoc(doc(db, getColPrivate(setorKey, "config"), "requisicao_config"));
+      const snap = await getDoc(doc(db, getCol(setorKey, "config"), "requisicao_config"));
       if (!snap.exists() || !snap.data().pin || snap.data().pin === pin) {
         onSuccess();
         return;
@@ -520,7 +516,7 @@ function FormRequisicao({ setorKey, setor, onBack, toast }) {
   const [enviado, setEnviado]           = useState(null);
 
   useEffect(() => {
-    getDocs(collection(db, getColPrivate(setorKey, "req_usuarios")))
+    getDocs(collection(db, getCol(setorKey, "req_usuarios")))
       .then(s => setUsuarios(s.docs.map(d => ({ id:d.id, ...d.data() })).sort((a,b)=>a.nome.localeCompare(b.nome))))
       .catch(() => setUsuarios([]))
       .finally(() => setLoadingUsers(false));
@@ -665,11 +661,7 @@ function HistoricoRequisicoes({ setorKey, setor }) {
   useEffect(() => {
     (async () => {
       try {
-        const s = await getDocs(query(
-          collection(db, getCol(setorKey, "requisicoes")),
-          where("setor", "==", setorKey),
-          orderBy("criadoEm", "desc")
-        ));
+        const s = await getDocs(query(collection(db, getCol(setorKey, "requisicoes")), orderBy("criadoEm", "desc")));
         setReqs(s.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch { setReqs([]); }
       finally { setLoading(false); }
