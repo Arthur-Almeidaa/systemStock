@@ -23,19 +23,24 @@ const _app = getApps().length ? getApps()[0] : initializeApp(_cfg);
 const db = getFirestore(_app);
 
 // ─── helpers ─────────────────────────────────────────────────
+// COLS: banco de PRODUTOS/CATEGORIAS (compartilhado entre exfood e bilheteria)
 const COLS = {
   ti:"estoque_ti", exfood:"estoque_exfood", bilheteria:"estoque_exfood",
-  limpeza:"estoque_limpeza",
-  ferramentas:"estoque_ferramentas", fti:"estoque_ferramentas_ti",
-  fmanutencao:"estoque_ferramentas_manutencao",
+  limpeza:"estoque_limpeza", ferramentas:"estoque_ferramentas",
+  fti:"estoque_ferramentas_ti", fmanutencao:"estoque_ferramentas_manutencao",
+};
+// COLS_PRIVATE: banco EXCLUSIVO do setor (requisições, config PIN, usuários)
+const COLS_PRIVATE = {
+  ti:"estoque_ti", exfood:"estoque_exfood", bilheteria:"estoque_bilheteria",
+  limpeza:"estoque_limpeza", ferramentas:"estoque_ferramentas",
+  fti:"estoque_ferramentas_ti", fmanutencao:"estoque_ferramentas_manutencao",
 };
 const LABELS = {
   ti:"TI", exfood:"X-food", bilheteria:"Bilheteria", limpeza:"Limpeza",
   ferramentas:"Ferramentas", fti:"Ferramentas TI", fmanutencao:"Manutenção",
 };
 const getCol = (setor, type) => `${COLS[setor]}_${type}`;
-// Coleções exclusivas do setor (PIN e usuários — não compartilhadas entre X-food e Bilheteria)
-const getColPrivate = (setor, type) => `estoque_${setor}_${type}`;
+const getColPrivate = (setor, type) => `${COLS_PRIVATE[setor]}_${type}`;
 const DEFAULT_THRESH = { baixo: 5, medio: 15 };
 
 // ─── ícones inline ───────────────────────────────────────────

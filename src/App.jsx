@@ -65,16 +65,18 @@ const Icon = ({ name, size = 18, color = "currentColor", style = {} }) => {
 };
 
 // ─── SETORES ─────────────────────────────────────────────────
+// col        = banco de PRODUTOS/CATEGORIAS (compartilhado entre exfood e bilheteria)
+// colPrivate = banco EXCLUSIVO do setor (requisições, log, config, usuários)
 const SETORES = {
-  ti:          { label:"TI",          iconName:"monitor",  color:"#3b82f6", col:"estoque_ti"          },
-  exfood:      { label:"X-food",      iconName:"utensils", color:"#f5a623", col:"estoque_exfood"      },
-  bilheteria:  { label:"Bilheteria",  iconName:"tag",      color:"#ec4899", col:"estoque_exfood"      },
-  limpeza:     { label:"Limpeza",     iconName:"sparkles", color:"#52c41a", col:"estoque_limpeza"     },
-  ferramentas: { label:"Ferramentas", iconName:"tools",    color:"#a855f7", col:"estoque_ferramentas" },
+  ti:          { label:"TI",          iconName:"monitor",  color:"#3b82f6", col:"estoque_ti",          colPrivate:"estoque_ti"          },
+  exfood:      { label:"X-food",      iconName:"utensils", color:"#f5a623", col:"estoque_exfood",      colPrivate:"estoque_exfood"      },
+  bilheteria:  { label:"Bilheteria",  iconName:"tag",      color:"#ec4899", col:"estoque_exfood",      colPrivate:"estoque_bilheteria"  },
+  limpeza:     { label:"Limpeza",     iconName:"sparkles", color:"#52c41a", col:"estoque_limpeza",     colPrivate:"estoque_limpeza"     },
+  ferramentas: { label:"Ferramentas", iconName:"tools",    color:"#a855f7", col:"estoque_ferramentas", colPrivate:"estoque_ferramentas" },
 };
 const FERRAMENTAS_SUB = {
-  fti:         { label:"T.I",        iconName:"cpu",    color:"#38bdf8", col:"estoque_ferramentas_ti"         },
-  fmanutencao: { label:"Manutenção", iconName:"hammer", color:"#fb923c", col:"estoque_ferramentas_manutencao" },
+  fti:         { label:"T.I",        iconName:"cpu",    color:"#38bdf8", col:"estoque_ferramentas_ti",         colPrivate:"estoque_ferramentas_ti"         },
+  fmanutencao: { label:"Manutenção", iconName:"hammer", color:"#fb923c", col:"estoque_ferramentas_manutencao", colPrivate:"estoque_ferramentas_manutencao" },
 };
 const IS_FERR_SUB = (k) => k === "fti" || k === "fmanutencao";
 
@@ -83,12 +85,16 @@ const resolveSetor = (setor) => {
   return SETORES[setor];
 };
 
+// getCol: produtos, categorias, produtos_padrao, config (thresholds) — banco COMPARTILHADO
 const getCol = (setor, type) => `${resolveSetor(setor).col}_${type}`;
+// getColPrivate: requisições, log, config (PIN), req_usuarios — banco EXCLUSIVO por setor
+const getColPrivate = (setor, type) => `${resolveSetor(setor).colPrivate}_${type}`;
+
 const fmtDate = (ts) => { if (!ts) return "—"; const d = ts.toDate ? ts.toDate() : new Date(ts); return d.toLocaleString("pt-BR"); };
 const DEFAULT_THRESH = { baixo: 5, medio: 15 };
 
 const registrarLog = (setor, tipo, dados) =>
-  addDoc(collection(db, getCol(setor, "log")), { tipo, ...dados, ts: serverTimestamp() });
+  addDoc(collection(db, getColPrivate(setor, "log")), { tipo, ...dados, ts: serverTimestamp() });
 
 async function gerarCodigoSemBarras(setor) {
   const configRef = doc(db, getCol(setor, "config"), "contador_sem_barras");
@@ -652,7 +658,7 @@ function SetorScreen({ user, onSelect }) {
       const map = {};
       for (const [key, s] of Object.entries(SETORES)) {
         try {
-          const snap = await getDocs(query(collection(db, `${s.col}_requisicoes`), where("status","==","pendente")));
+          const snap = await getDocs(query(collection(db, `${s.colPrivate}_requisicoes`), where("status","==","pendente")));
           map[key] = snap.size;
         } catch { map[key] = 0; }
       }
@@ -1028,7 +1034,7 @@ function LogCompleto({ setor, addToast }) {
   useEffect(()=>{
     (async()=>{
       setLoading(true);
-      try{const s=await getDocs(query(collection(db,getCol(setor,"log")),orderBy("ts","desc"),limit(200)));setLogs(s.docs.map(d=>({id:d.id,...d.data()})));}
+      try{const s=await getDocs(query(collection(db,getColPrivate(setor,"log")),orderBy("ts","desc"),limit(200)));setLogs(s.docs.map(d=>({id:d.id,...d.data()})));}
       catch(e){addToast("Erro: "+e.message,"error");}finally{setLoading(false);}
     })();
   },[setor]);
@@ -1109,8 +1115,8 @@ function ReqDetalhe({ req, onClose, onUpdate, addToast, user }) {
     const nowEntregue = status === "entregue";
 
     try {
-      // Atualiza o status da requisição
-      await updateDoc(doc(db, getCol(req.setor, "requisicoes"), req.id), {
+      // Atualiza o status da requisição — coleção PRIVADA do setor
+      await updateDoc(doc(db, getColPrivate(req.setor, "requisicoes"), req.id), {
         status,
         respostaAdmin: resposta.trim(),
         atualizadoEm: serverTimestamp(),
@@ -1118,6 +1124,7 @@ function ReqDetalhe({ req, onClose, onUpdate, addToast, user }) {
 
       // ── SAÍDA AUTOMÁTICA ao marcar como "entregue" ────────
       if (nowEntregue && !wasEntregue && req.itens?.length > 0) {
+        // Produtos: banco COMPARTILHADO (exfood e bilheteria usam o mesmo)
         const colEst = getCol(req.setor, "produtos");
         const erros  = [];
 
@@ -1281,8 +1288,7 @@ function GestaoRequisicoes({ setor, user, addToast }) {
     setLoading(true);
     try {
       const s = await getDocs(query(
-        collection(db, getCol(setor, "requisicoes")),
-        where("setor", "==", setor),
+        collection(db, getColPrivate(setor, "requisicoes")),
         orderBy("criadoEm", "desc"),
         limit(100)
       ));
@@ -1406,7 +1412,7 @@ export default function App() {
   const loadPendingReqs = useCallback(async (sk) => {
     if (!sk) return;
     try {
-      const s = await getDocs(query(collection(db, getCol(sk, "requisicoes")), where("setor","==",sk), where("status","==","pendente")));
+      const s = await getDocs(query(collection(db, getColPrivate(sk, "requisicoes")), where("status","==","pendente")));
       setPendingReqs(s.size);
     } catch { setPendingReqs(0); }
   }, []);

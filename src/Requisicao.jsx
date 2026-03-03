@@ -41,21 +41,24 @@ function clearSession() {
   try { localStorage.removeItem(SESSION_KEY); } catch {}
 }
 
+// colBase        = banco COMPARTILHADO — produtos, categorias (exfood e bilheteria usam o mesmo)
+// colBasePrivate = banco EXCLUSIVO — requisições, config (PIN), req_usuarios
 const SETORES = {
-  ti:          { label:"TI",          icon:"🖥️",  color:"#3b82f6", colBase:"estoque_ti"          },
-  exfood:      { label:"X-food",      icon:"🍽️",  color:"#f5a623", colBase:"estoque_exfood"      },
-  bilheteria:  { label:"Bilheteria",  icon:"🎟️",  color:"#ec4899", colBase:"estoque_exfood"      },
-  limpeza:     { label:"Limpeza",     icon:"✨",  color:"#52c41a", colBase:"estoque_limpeza"     },
-  ferramentas: { label:"Ferramentas", icon:"🔧",  color:"#a855f7", colBase:"estoque_ferramentas" },
+  ti:          { label:"TI",          icon:"🖥️",  color:"#3b82f6", colBase:"estoque_ti",          colBasePrivate:"estoque_ti"          },
+  exfood:      { label:"X-food",      icon:"🍽️",  color:"#f5a623", colBase:"estoque_exfood",      colBasePrivate:"estoque_exfood"      },
+  bilheteria:  { label:"Bilheteria",  icon:"🎟️",  color:"#ec4899", colBase:"estoque_exfood",      colBasePrivate:"estoque_bilheteria"  },
+  limpeza:     { label:"Limpeza",     icon:"✨",  color:"#52c41a", colBase:"estoque_limpeza",     colBasePrivate:"estoque_limpeza"     },
+  ferramentas: { label:"Ferramentas", icon:"🔧",  color:"#a855f7", colBase:"estoque_ferramentas", colBasePrivate:"estoque_ferramentas" },
 };
 const FERRAMENTAS_SUB = {
-  fti:         { label:"Ferramentas TI",         icon:"💻", color:"#38bdf8", colBase:"estoque_ferramentas_ti"         },
-  fmanutencao: { label:"Ferramentas Manutenção", icon:"🔨", color:"#fb923c", colBase:"estoque_ferramentas_manutencao" },
+  fti:         { label:"Ferramentas TI",         icon:"💻", color:"#38bdf8", colBase:"estoque_ferramentas_ti",         colBasePrivate:"estoque_ferramentas_ti"         },
+  fmanutencao: { label:"Ferramentas Manutenção", icon:"🔨", color:"#fb923c", colBase:"estoque_ferramentas_manutencao", colBasePrivate:"estoque_ferramentas_manutencao" },
 };
 const ALL_SETORES = { ...SETORES, ...FERRAMENTAS_SUB };
+// getCol: produtos, categorias, produtos_padrao — banco COMPARTILHADO
 const getCol = (k, t) => `${ALL_SETORES[k].colBase}_${t}`;
-// Coleções exclusivas do setor (não compartilhadas): req_usuarios, config de PIN
-const getColPrivate = (k, t) => `estoque_${k}_${t}`;
+// getColPrivate: requisições, config (PIN), req_usuarios — banco EXCLUSIVO por setor
+const getColPrivate = (k, t) => `${ALL_SETORES[k].colBasePrivate}_${t}`;
 
 // ─── CSS ─────────────────────────────────────────────────────
 const css = `
@@ -548,7 +551,7 @@ function FormRequisicao({ setorKey, setor, onBack, toast }) {
     setLoading(true);
     try {
       const codigo = genCodigo();
-      await addDoc(collection(db, getCol(setorKey, "requisicoes")), {
+      await addDoc(collection(db, getColPrivate(setorKey, "requisicoes")), {
         codigo, setor: setorKey, setorLabel: setor.label,
         solicitante: solicitante.trim(), itens,
         observacao: obs.trim(), status: "pendente",
@@ -665,11 +668,7 @@ function HistoricoRequisicoes({ setorKey, setor }) {
   useEffect(() => {
     (async () => {
       try {
-        const s = await getDocs(query(
-          collection(db, getCol(setorKey, "requisicoes")),
-          where("setor", "==", setorKey),
-          orderBy("criadoEm", "desc")
-        ));
+        const s = await getDocs(query(collection(db, getColPrivate(setorKey, "requisicoes")), orderBy("criadoEm", "desc")));
         setReqs(s.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch { setReqs([]); }
       finally { setLoading(false); }
