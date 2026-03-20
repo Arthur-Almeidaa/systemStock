@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Analytics } from "./Analytics.jsx";
 import { Configuracoes } from "./Configuracoes.jsx";
+import { Uniformes } from "./Uniformes.jsx";
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import {
@@ -56,6 +57,8 @@ const Icon = ({ name, size = 18, color = "currentColor", style = {} }) => {
     key: <><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></>,
     bell: <><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></>,
     truck: <><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></>,
+    // ─── ÍCONE UNIFORME (camiseta) ───────────────────────────
+    shirt: <><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.57a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.57a2 2 0 0 0-1.34-2.23z"/></>,
   };
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ display:"inline-block", flexShrink:0, ...style }}>
@@ -65,8 +68,6 @@ const Icon = ({ name, size = 18, color = "currentColor", style = {} }) => {
 };
 
 // ─── SETORES ─────────────────────────────────────────────────
-// col        = banco de PRODUTOS/CATEGORIAS (compartilhado entre exfood e bilheteria)
-// colPrivate = banco EXCLUSIVO do setor (requisições, log, config, usuários)
 const SETORES = {
   ti:          { label:"TI",          iconName:"monitor",  color:"#3b82f6", col:"estoque_ti",          colPrivate:"estoque_ti"          },
   exfood:      { label:"X-food",      iconName:"utensils", color:"#f5a623", col:"estoque_exfood",      colPrivate:"estoque_exfood"      },
@@ -85,9 +86,7 @@ const resolveSetor = (setor) => {
   return SETORES[setor];
 };
 
-// getCol: produtos, categorias, produtos_padrao, config (thresholds) — banco COMPARTILHADO
-const getCol = (setor, type) => `${resolveSetor(setor).col}_${type}`;
-// getColPrivate: requisições, log, config (PIN), req_usuarios — banco EXCLUSIVO por setor
+const getCol        = (setor, type) => `${resolveSetor(setor).col}_${type}`;
 const getColPrivate = (setor, type) => `${resolveSetor(setor).colPrivate}_${type}`;
 
 const fmtDate = (ts) => { if (!ts) return "—"; const d = ts.toDate ? ts.toDate() : new Date(ts); return d.toLocaleString("pt-BR"); };
@@ -555,7 +554,6 @@ function StatusBar({ qtd, thresh }) {
   );
 }
 
-// ─── SearchBox simples (sem localStorage) ────────────────────
 function SearchBox({ value, onChange, placeholder = "Buscar...", style = {} }) {
   return (
     <div style={{ display:"flex", alignItems:"center", background:"var(--surface2)", border:"1px solid var(--border2)", borderRadius:"var(--r)", overflow:"hidden", marginBottom:10, ...style }}>
@@ -567,7 +565,6 @@ function SearchBox({ value, onChange, placeholder = "Buscar...", style = {} }) {
   );
 }
 
-// ─── SelectSearch ────────────────────────────────────────────
 function SelectSearch({ value, onChange, options, placeholder = "Selecionar...", label, emptyLabel = "Todas", allowEmpty = false }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -651,6 +648,19 @@ const SetorCard = ({ s, onClick, pendentes = 0 }) => (
   </div>
 );
 
+// ─── Card especial para Uniformes ────────────────────────────
+const UniformesCard = ({ onClick }) => (
+  <div className="setor-card" style={{ "--c":"#f5a623", position:"relative" }} onClick={onClick}>
+    <span style={{ display:"flex", alignItems:"center", justifyContent:"center" }}>
+      <Icon name="shirt" size={38} color="#f5a623"/>
+    </span>
+    <div>
+      <div className="setor-card-name" style={{ color:"#f5a623" }}>UNIFORMES</div>
+      <div className="setor-card-sub">Gestão de roupas</div>
+    </div>
+  </div>
+);
+
 function SetorScreen({ user, onSelect }) {
   const [pendMap, setPendMap] = useState({});
   useEffect(() => {
@@ -670,7 +680,11 @@ function SetorScreen({ user, onSelect }) {
     <div className="setor-screen">
       <div className="setor-heading"><h2>SELECIONE O SETOR</h2><p>{user.email}</p></div>
       <div className="setor-cards">
-        {Object.entries(SETORES).map(([key, s]) => <SetorCard key={key} s={s} pendentes={pendMap[key]||0} onClick={() => onSelect(key)}/>)}
+        {Object.entries(SETORES).map(([key, s]) => (
+          <SetorCard key={key} s={s} pendentes={pendMap[key]||0} onClick={() => onSelect(key)}/>
+        ))}
+        {/* ─── Card Uniformes — somente admin ─── */}
+        <UniformesCard onClick={() => onSelect("uniformes")}/>
       </div>
     </div>
   );
@@ -897,7 +911,6 @@ function Saida({ setor, onRefresh, addToast, user }) {
     } catch(e) { addToast("Erro: "+e.message,"error"); } finally { setLoading(false); }
   };
 
-  // ── Saída manual (origin = "manual") ─────────────────────
   const doSaida = async (produto) => {
     const p=produto||found, qtd=Math.max(1,parseInt(qtdSaida)||1);
     if (!p||(p.quantidade||0)<=0) { addToast("Sem estoque!","error"); return; }
@@ -905,7 +918,6 @@ function Saida({ setor, onRefresh, addToast, user }) {
     setLoading(true);
     try {
       await updateDoc(doc(db,colEst,p.id),{quantidade:increment(-qtd)});
-      // Registra como saída manual (sem origem = "manual")
       await registrarLog(setor,"saida",{produto:p.nome,categoria:p.categoria,quantidade:qtd,usuario:user.email,origem:"manual"});
       addToast(`Saída: ${qtd}x "${p.nome}". Restam ${(p.quantidade||qtd)-qtd} un.`,"success");
       setFound(null); setManual(""); setQtdSaida(1); setProdSel(""); setCatSel(""); setProdEncontrado(null); setAuthOk(false); onRefresh();
@@ -1085,7 +1097,7 @@ function LogCompleto({ setor, addToast }) {
 }
 
 // ============================================================
-// GESTÃO DE REQUISIÇÕES — com saída automática ao marcar "entregue"
+// GESTÃO DE REQUISIÇÕES
 // ============================================================
 const STATUS_REQ = {
   pendente: { label:"Pendente",  cls:"req-status-pendente",  badge:"badge-med"  },
@@ -1098,9 +1110,8 @@ function ReqDetalhe({ req, onClose, onUpdate, addToast, user }) {
   const [status, setStatus]     = useState(req.status || "pendente");
   const [resposta, setResposta] = useState(req.respostaAdmin || "");
   const [saving, setSaving]     = useState(false);
-  const [preview, setPreview]   = useState(null); // preview da saída que será feita
+  const [preview, setPreview]   = useState(null);
 
-  // Ao selecionar "entregue", faz preview dos itens
   useEffect(() => {
     if (status === "entregue" && req.status !== "entregue") {
       setPreview(req.itens || []);
@@ -1113,60 +1124,32 @@ function ReqDetalhe({ req, onClose, onUpdate, addToast, user }) {
     setSaving(true);
     const wasEntregue = req.status === "entregue";
     const nowEntregue = status === "entregue";
-
     try {
-      // Atualiza o status da requisição — coleção PRIVADA do setor
       await updateDoc(doc(db, getColPrivate(req.setor, "requisicoes"), req.id), {
-        status,
-        respostaAdmin: resposta.trim(),
-        atualizadoEm: serverTimestamp(),
+        status, respostaAdmin: resposta.trim(), atualizadoEm: serverTimestamp(),
       });
-
-      // ── SAÍDA AUTOMÁTICA ao marcar como "entregue" ────────
       if (nowEntregue && !wasEntregue && req.itens?.length > 0) {
-        // Produtos: banco COMPARTILHADO (exfood e bilheteria usam o mesmo)
         const colEst = getCol(req.setor, "produtos");
         const erros  = [];
-
         for (const item of req.itens) {
           const qtd = Number(item.quantidade) || 1;
           try {
-            // Busca o produto no estoque
             const snap = await getDocs(query(collection(db, colEst), where("nome", "==", item.nome)));
             if (!snap.empty) {
               const prodDoc = snap.docs[0];
               const estAtual = prodDoc.data().quantidade || 0;
-              const novoEst  = Math.max(0, estAtual - qtd);
-              await updateDoc(doc(db, colEst, prodDoc.id), { quantidade: novoEst });
-
-              // Registra no log como "saida por requisição"
+              await updateDoc(doc(db, colEst, prodDoc.id), { quantidade: Math.max(0, estAtual - qtd) });
               await registrarLog(req.setor, "saida", {
-                produto:     item.nome,
-                categoria:   item.categoria || "",
-                quantidade:  qtd,
-                usuario:     user?.email || "sistema",
-                origem:      "requisicao",         // ← marca origem
-                reqCodigo:   req.codigo,
-                reqId:       req.id,
-                solicitante: req.solicitante || "",
+                produto: item.nome, categoria: item.categoria || "", quantidade: qtd,
+                usuario: user?.email || "sistema", origem: "requisicao",
+                reqCodigo: req.codigo, reqId: req.id, solicitante: req.solicitante || "",
               });
-            } else {
-              erros.push(`"${item.nome}" não encontrado no estoque`);
-            }
-          } catch (e) {
-            erros.push(`Erro em "${item.nome}": ${e.message}`);
-          }
+            } else { erros.push(`"${item.nome}" não encontrado`); }
+          } catch (e) { erros.push(`Erro em "${item.nome}": ${e.message}`); }
         }
-
-        if (erros.length > 0) {
-          addToast(`Saída parcial. Erros: ${erros.join("; ")}`, "error");
-        } else {
-          addToast(`✅ Entregue! Saída automática registrada para ${req.itens.length} item(ns).`, "success");
-        }
-      } else {
-        addToast("Requisição atualizada!", "success");
-      }
-
+        if (erros.length > 0) addToast(`Saída parcial. Erros: ${erros.join("; ")}`, "error");
+        else addToast(`✅ Entregue! Saída registrada para ${req.itens.length} item(ns).`, "success");
+      } else { addToast("Requisição atualizada!", "success"); }
       onUpdate({ ...req, status, respostaAdmin: resposta.trim() });
       onClose();
     } catch (e) { addToast("Erro: " + e.message, "error"); }
@@ -1174,27 +1157,21 @@ function ReqDetalhe({ req, onClose, onUpdate, addToast, user }) {
   };
 
   const s = resolveSetor(req.setor);
-
   return (
     <div className="req-detail-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="req-detail-box">
         <div className="req-detail-header">
           <div>
             <div className="req-detail-codigo">{req.codigo}</div>
-            <div style={{ fontFamily:"var(--mono)", fontSize:10, color:"var(--text-dim)" }}>
-              {s?.label} · {fmtDate(req.criadoEm)}
-            </div>
+            <div style={{ fontFamily:"var(--mono)", fontSize:10, color:"var(--text-dim)" }}>{s?.label} · {fmtDate(req.criadoEm)}</div>
           </div>
           <button className="btn-icon-sm" onClick={onClose}><Icon name="x" size={14}/></button>
         </div>
         <div style={{ padding:"16px 20px" }}>
-          {/* Solicitante */}
           <div style={{ marginBottom:14 }}>
             <div style={{ fontFamily:"var(--mono)", fontSize:9, color:"var(--text-dim)", letterSpacing:2, textTransform:"uppercase", marginBottom:4 }}>Solicitante</div>
             <div style={{ fontFamily:"var(--sans)", fontSize:14, fontWeight:600 }}>{req.solicitante}</div>
           </div>
-
-          {/* Itens */}
           <div style={{ marginBottom:14 }}>
             <div style={{ fontFamily:"var(--mono)", fontSize:9, color:"var(--text-dim)", letterSpacing:2, textTransform:"uppercase", marginBottom:8 }}>Itens ({req.itens?.length || 0})</div>
             {req.itens?.map((item, i) => (
@@ -1207,46 +1184,29 @@ function ReqDetalhe({ req, onClose, onUpdate, addToast, user }) {
               </div>
             ))}
           </div>
-
-          {/* Observação */}
           {req.observacao && (
             <div style={{ marginBottom:14, background:"var(--surface2)", border:"1px solid var(--border)", borderRadius:"var(--r)", padding:"10px 14px" }}>
               <div style={{ fontFamily:"var(--mono)", fontSize:9, color:"var(--text-dim)", letterSpacing:2, marginBottom:4 }}>OBS</div>
               <div style={{ fontFamily:"var(--mono)", fontSize:12 }}>{req.observacao}</div>
             </div>
           )}
-
           <div className="divider"/>
-
-          {/* Aviso de saída automática */}
           {status === "entregue" && req.status !== "entregue" && (
             <div style={{ background:"rgba(74,222,128,.06)", border:"1px solid var(--success)", borderRadius:"var(--r)", padding:"10px 14px", marginBottom:14 }}>
               <div style={{ fontFamily:"var(--mono)", fontSize:10, color:"var(--success)", letterSpacing:2, marginBottom:4 }}>⚡ SAÍDA AUTOMÁTICA</div>
               <div style={{ fontFamily:"var(--mono)", fontSize:11, color:"var(--text-dim)" }}>
-                Ao confirmar como <strong style={{ color:"var(--success)" }}>Entregue</strong>, o sistema descontará automaticamente do estoque e registrará no log como <strong style={{ color:"#f97316" }}>Saída por Requisição</strong>.
+                Ao confirmar como <strong style={{ color:"var(--success)" }}>Entregue</strong>, o sistema descontará automaticamente do estoque.
               </div>
-              {preview && (
-                <div style={{ marginTop:8 }}>
-                  {preview.map((item, i) => (
-                    <div key={i} style={{ fontFamily:"var(--mono)", fontSize:11, color:"var(--success)", padding:"3px 0" }}>
-                      − {item.quantidade}x {item.nome}
-                    </div>
-                  ))}
-                </div>
-              )}
+              {preview && preview.map((item, i) => (
+                <div key={i} style={{ fontFamily:"var(--mono)", fontSize:11, color:"var(--success)", padding:"3px 0" }}>− {item.quantidade}x {item.nome}</div>
+              ))}
             </div>
           )}
-
-          {/* Aviso se já foi entregue */}
           {req.status === "entregue" && (
             <div style={{ background:"rgba(96,165,250,.06)", border:"1px solid var(--info)", borderRadius:"var(--r)", padding:"10px 14px", marginBottom:14 }}>
-              <div style={{ fontFamily:"var(--mono)", fontSize:11, color:"var(--info)" }}>
-                ✅ Esta requisição já foi entregue. A saída do estoque já foi registrada automaticamente.
-              </div>
+              <div style={{ fontFamily:"var(--mono)", fontSize:11, color:"var(--info)" }}>✅ Esta requisição já foi entregue. A saída já foi registrada automaticamente.</div>
             </div>
           )}
-
-          {/* Status */}
           <div className="form-group">
             <label className="form-label">Status</label>
             <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
@@ -1257,15 +1217,12 @@ function ReqDetalhe({ req, onClose, onUpdate, addToast, user }) {
               ))}
             </div>
           </div>
-
-          {/* Resposta admin */}
           <div className="form-group">
             <label className="form-label">Resposta / Observação <span style={{ color:"var(--text-dim)", fontWeight:400 }}>(opcional)</span></label>
             <textarea
               style={{ width:"100%", background:"var(--surface2)", border:"1px solid var(--border2)", color:"var(--text)", padding:"11px 14px", fontFamily:"var(--mono)", fontSize:13, outline:"none", borderRadius:"var(--r)", resize:"vertical", minHeight:70 }}
               placeholder="Informe prazo, local de entrega, motivo de recusa..."
-              value={resposta}
-              onChange={e => setResposta(e.target.value)}
+              value={resposta} onChange={e => setResposta(e.target.value)}
             />
           </div>
           <button className="btn btn-accent btn-lg btn-full" onClick={salvar} disabled={saving}>
@@ -1287,11 +1244,7 @@ function GestaoRequisicoes({ setor, user, addToast }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const s = await getDocs(query(
-        collection(db, getColPrivate(setor, "requisicoes")),
-        orderBy("criadoEm", "desc"),
-        limit(100)
-      ));
+      const s = await getDocs(query(collection(db, getColPrivate(setor, "requisicoes")), orderBy("criadoEm", "desc"), limit(100)));
       setReqs(s.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch(e) { addToast("Erro: " + e.message, "error"); }
     finally { setLoading(false); }
@@ -1299,9 +1252,7 @@ function GestaoRequisicoes({ setor, user, addToast }) {
 
   useEffect(() => { load(); }, [setor]);
 
-  const handleUpdate = (updated) => {
-    setReqs(prev => prev.map(r => r.id === updated.id ? updated : r));
-  };
+  const handleUpdate = (updated) => setReqs(prev => prev.map(r => r.id === updated.id ? updated : r));
 
   const counts = {
     todos:    reqs.length,
@@ -1318,7 +1269,6 @@ function GestaoRequisicoes({ setor, user, addToast }) {
       r.itens?.some(i => (i.nome||"").toLowerCase().includes(q)));
 
   const s = resolveSetor(setor);
-
   return (
     <div>
       <div className="page-hd">
@@ -1375,14 +1325,14 @@ function GestaoRequisicoes({ setor, user, addToast }) {
 // APP PRINCIPAL
 // ============================================================
 export default function App() {
-  const [user, setUser]           = useState(null);
-  const [setor, setSetor]         = useState(null);
+  const [user, setUser]               = useState(null);
+  const [setor, setSetor]             = useState(null);
   const [showFerrSub, setShowFerrSub] = useState(false);
-  const [tab, setTab]             = useState("dashboard");
-  const [products, setProducts]   = useState([]);
-  const [toasts, setToasts]       = useState([]);
-  const [loadingP, setLoadingP]   = useState(false);
-  const [thresh, setThresh]       = useState(DEFAULT_THRESH);
+  const [tab, setTab]                 = useState("dashboard");
+  const [products, setProducts]       = useState([]);
+  const [toasts, setToasts]           = useState([]);
+  const [loadingP, setLoadingP]       = useState(false);
+  const [thresh, setThresh]           = useState(DEFAULT_THRESH);
   const [pendingReqs, setPendingReqs] = useState(0);
 
   const addToast = useCallback((message, type = "info") => {
@@ -1418,7 +1368,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (user && setor) {
+    if (user && setor && setor !== "uniformes") {
       loadProducts(setor);
       loadThresh(setor);
       loadPendingReqs(setor);
@@ -1430,15 +1380,25 @@ export default function App() {
     setUser(null); setSetor(null); setShowFerrSub(false); setTab("dashboard");
     setProducts([]); setPendingReqs(0);
   };
+
   const selectSetor = (k) => {
     if (k === "ferramentas") { setShowFerrSub(true); return; }
+    // ─── Uniformes: rota especial, não precisa carregar produtos ───
+    if (k === "uniformes") {
+      setSetor("uniformes"); setShowFerrSub(false); setTab("dashboard");
+      setProducts([]); setThresh(DEFAULT_THRESH); setPendingReqs(0);
+      return;
+    }
     setSetor(k); setShowFerrSub(false); setTab("dashboard"); setProducts([]); setThresh(DEFAULT_THRESH); setPendingReqs(0);
   };
+
   const selectFerrSub = (k) => {
     setSetor(k); setShowFerrSub(false); setTab("dashboard"); setProducts([]); setThresh(DEFAULT_THRESH); setPendingReqs(0);
   };
+
   const back = () => { setSetor(null); setShowFerrSub(false); setTab("dashboard"); setProducts([]); setPendingReqs(0); };
-  const s = setor ? resolveSetor(setor) : null;
+
+  const s = setor && setor !== "uniformes" ? resolveSetor(setor) : null;
 
   const navItems = [
     { id:"dashboard",   icon:"home",         label:"Home"     },
@@ -1459,23 +1419,18 @@ export default function App() {
 
   if (!user) return <><style>{styles}</style><LoginScreen onLogin={setUser}/><Toast toasts={toasts}/></>;
 
- if (!setor) return (
+  if (!setor) return (
     <><style>{styles}</style>
     <div className="app">
       <header className="header">
         <div className="header-logo">PARK</div>
         <div className="header-right">
-
-          {/* ADM VERDE */}
           <a href="/Baixar/index804521.html" className="hbtn" style={{ textDecoration:"none", borderColor:"var(--success)", color:"var(--success)" }}>
             ⬇ APP ADM
           </a>
-
-          {/*USER VERMELHO */}
           <a href="/Baixar/user.html" className="hbtn" style={{ textDecoration:"none", borderColor:"var(--danger)", color:"var(--danger)" }}>
             ⬇ App USER
           </a>
-
           <span className="header-email">{user.email}</span>
           <button className="hbtn danger" onClick={logout}><Icon name="logout" size={14}/> SAIR</button>
         </div>
@@ -1487,6 +1442,33 @@ export default function App() {
     <Toast toasts={toasts}/></>
   );
 
+  // ============================================================
+  // ─── RENDER UNIFORMES (página especial sem sidebar de estoque)
+  // ============================================================
+  if (setor === "uniformes") return (
+    <><style>{styles}</style>
+    <div className="app">
+      <header className="header">
+        <div className="header-logo">
+          <Icon name="shirt" size={20} color="#f5a623"/>
+          PARK <span className="setor-tag" style={{ borderColor:"#f5a623", color:"#f5a623" }}>UNIFORMES</span>
+        </div>
+        <div className="header-right">
+          <span className="header-email">{user.email}</span>
+          <button className="hbtn" onClick={back}><Icon name="arrowLeft" size={14}/> Setores</button>
+          <button className="hbtn danger" onClick={logout}><Icon name="logout" size={14}/></button>
+        </div>
+      </header>
+      <div style={{ flex:1, overflowY:"auto", padding:"24px 20px", WebkitOverflowScrolling:"touch" }}>
+        <Uniformes user={user}/>
+      </div>
+    </div>
+    <Toast toasts={toasts}/></>
+  );
+
+  // ============================================================
+  // ─── RENDER SETORES NORMAIS
+  // ============================================================
   return (
     <><style>{styles}</style>
     <div className="app">
