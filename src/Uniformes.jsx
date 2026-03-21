@@ -1164,69 +1164,90 @@ function TabUsuarios({ usuarios, itens, variacoes, produtos, setoresCfg, onRefre
     const cor = selUser?.cor || PALETTE[0];
     return (
       <div className="ufd">
-        <Breadcrumb items={[
-          { label:"Usuários", onClick:()=>{ setSelUser(null); setDiscItem(null); setDiscMU(""); } },
-          { label:selUser?.nome || "" },
-        ]}/>
-        <BackBtn onClick={()=>{ setSelUser(null); setDiscItem(null); setDiscMU(""); }} label="Voltar para usuários"/>
-        {/* Card do usuário */}
-        <div style={{ display:"flex", alignItems:"center", gap:14, padding:"16px", background:"var(--s2)", border:`1px solid ${cor}44`, borderRadius:"var(--r)", marginBottom:20 }}>
-          <div className="uavatar" style={{ background:`${cor}22`, border:`2px solid ${cor}55`, color:cor, width:52, height:52, fontSize:24 }}>
+        {/* Cabeçalho: voltar + nome + setor + ações */}
+        <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:20, flexWrap:"wrap" }}>
+          <button className="u-back" style={{ margin:0 }} onClick={()=>{ setSelUser(null); setDiscItem(null); setDiscMU(""); }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+              <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+            </svg>
+          </button>
+          {/* Avatar */}
+          <div style={{ width:38,height:38,borderRadius:"50%",background:`${cor}22`,border:`2px solid ${cor}55`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontFamily:"'Syne',sans-serif",fontSize:18,fontWeight:800,color:cor }}>
             {selUser?.nome?.charAt(0).toUpperCase()}
           </div>
-          <div style={{ flex:1 }}>
-            <div style={{ fontFamily:"'Syne',sans-serif", fontSize:20, fontWeight:800 }}>{selUser?.nome}</div>
-            {selUser?.setor && <div style={{ marginTop:4 }}><SetorChip setor={selUser.setor} cor={cor}/></div>}
+          {/* Nome + setor */}
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontFamily:"'Syne',sans-serif", fontSize:18, fontWeight:800, lineHeight:1.1, display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+              {selUser?.nome}
+              {selUser?.setor && <SetorChip setor={selUser.setor} cor={cor}/>}
+            </div>
           </div>
-          <div style={{ display:"flex", gap:6 }}>
+          {/* Editar + Excluir */}
+          <div style={{ display:"flex", gap:6, flexShrink:0 }}>
             <button className="ub ub-ghost ub-sm" onClick={()=>{ setEditUser(selUser); setEditNome(selUser.nome); setEditSetor(selUser.setor||""); setEditCor(selUser.cor||PALETTE[0]); }}>
-              <Icon n="edit" s={13}/> Editar
+              <Icon n="edit" s={13}/>
             </button>
             <button className="ub ub-err ub-sm" onClick={()=>excluirUser(selUser)}>
-              <Icon n="trash" s={13}/> Excluir
+              <Icon n="trash" s={13}/>
             </button>
           </div>
         </div>
-        {/* Itens */}
+
+        {/* Lista de uniformes */}
         <div className="usec">Uniformes atribuídos ({userItens.reduce((s,i)=>s+(i.qtd||1),0)} peças)</div>
         {userItens.length === 0
-          ? <div style={{ fontFamily:"var(--mono)",fontSize:12,color:"var(--muted)",padding:"20px",textAlign:"center",border:"1px dashed var(--b)",borderRadius:"var(--rs)" }}>
-              Nenhum uniforme atribuído a este usuário.
+          ? <div style={{ fontFamily:"var(--mono)",fontSize:12,color:"var(--muted)",padding:"24px",textAlign:"center",border:"1px dashed var(--b)",borderRadius:"var(--rs)" }}>
+              Nenhum uniforme atribuído.
             </div>
           : userItens.map(item => {
-              const icor    = item.cor || PALETTE[0];
-              const isDisc  = discItem?.id === item.id;
+              const icor   = item.cor || PALETTE[0];
+              const isDisc = discItem?.id === item.id;
               return (
-                <div key={item.id} className="irow" style={{ marginBottom:8 }}>
-                  <div style={{ width:38,height:38,borderRadius:"var(--rs)",background:`${icor}18`,border:`2px solid ${icor}33`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
-                    <Icon n="shirt" s={18} c={icor}/>
-                  </div>
-                  <div style={{ flex:1, minWidth:0 }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:icor }}>{item.produtoNome}</div>
-                    <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:10, color:"var(--muted)", marginTop:2 }}>
-                      TAM {item.tamanho} · {fmt(item.data)}
-                    </div>
-                    {isDisc && (
-                      <div className="ufd" style={{ marginTop:8 }}>
-                        <input className="ui" value={discMotivoU} onChange={e=>setDiscMU(e.target.value)} placeholder="Motivo do descarte..." style={{ marginBottom:6, fontSize:12 }} autoFocus onKeyDown={e=>e.key==="Enter"&&descartarDoUser()}/>
-                        <div style={{ display:"flex", gap:6 }}>
-                          <button className="ub ub-err ub-sm ub-full" onClick={descartarDoUser}>Confirmar descarte</button>
-                          <button className="ub ub-ghost ub-sm" onClick={()=>{setDiscItem(null);setDiscMU("");}}>✕</button>
+                <div key={item.id} style={{ background:"var(--s2)", border:`1px solid var(--b)`, borderRadius:"var(--r)", marginBottom:10, overflow:"hidden" }}>
+                  {/* Barra de cor no topo */}
+                  <div style={{ height:3, background:icor }}/>
+                  <div style={{ padding:"14px 16px" }}>
+                    {/* Info do item */}
+                    <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:12 }}>
+                      <div style={{ width:44,height:44,borderRadius:"var(--rs)",background:`${icor}18`,border:`2px solid ${icor}44`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
+                        <Icon n="shirt" s={22} c={icor}/>
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontFamily:"'Syne',sans-serif", fontSize:16, fontWeight:800, color:icor, lineHeight:1.1 }}>{item.produtoNome}</div>
+                        <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:11, color:"var(--muted)", marginTop:3 }}>
+                          Tamanho {item.tamanho} · {fmt(item.data)}
                         </div>
                       </div>
-                    )}
-                  </div>
-                  <div style={{ fontFamily:"'Syne',sans-serif",fontSize:22,fontWeight:700,color:"var(--info)",flexShrink:0 }}>×{item.qtd||1}</div>
-                  {!isDisc && (
-                    <div style={{ display:"flex", flexDirection:"column", gap:5, flexShrink:0 }}>
-                      <button className="ub ub-ok ub-sm" style={{ fontSize:10,padding:"5px 9px" }} onClick={()=>devolverEstoque(item)}>
-                        <Icon n="refresh" s={11}/> Estoque
-                      </button>
-                      <button className="ub ub-err ub-sm" style={{ fontSize:10,padding:"5px 9px" }} onClick={()=>{setDiscItem(item);setDiscMU("");}}>
-                        <Icon n="trash" s={11}/> Descartar
-                      </button>
+                      <div style={{ fontFamily:"'Syne',sans-serif", fontSize:28, fontWeight:800, color:"var(--info)", flexShrink:0 }}>×{item.qtd||1}</div>
                     </div>
-                  )}
+                    {/* Botões de ação */}
+                    {!isDisc
+                      ? (
+                        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+                          <button className="ub ub-ok ub-full" onClick={()=>devolverEstoque(item)}>
+                            <Icon n="refresh" s={15}/> Devolver ao estoque
+                          </button>
+                          <button className="ub ub-err ub-full" onClick={()=>{ setDiscItem(item); setDiscMU(""); }}>
+                            <Icon n="trash" s={15}/> Descartar
+                          </button>
+                        </div>
+                      )
+                      : (
+                        <div className="ufd">
+                          <input className="ui" value={discMotivoU} onChange={e=>setDiscMU(e.target.value)}
+                            placeholder="Motivo do descarte..." style={{ marginBottom:8 }}
+                            autoFocus onKeyDown={e=>e.key==="Enter"&&descartarDoUser()}/>
+                          <div style={{ display:"grid", gridTemplateColumns:"1fr auto", gap:8 }}>
+                            <button className="ub ub-err ub-full" onClick={descartarDoUser} disabled={!discMotivoU.trim()}>
+                              <Icon n="trash" s={14}/> Confirmar descarte
+                            </button>
+                            <button className="ub ub-ghost" onClick={()=>{ setDiscItem(null); setDiscMU(""); }}>
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                  </div>
                 </div>
               );
             })}
