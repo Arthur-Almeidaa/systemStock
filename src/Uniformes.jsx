@@ -49,9 +49,17 @@ const CSS = `
   .ur *{box-sizing:border-box;margin:0;padding:0;}
   .ur input,.ur select,.ur textarea{font-size:16px !important;-webkit-text-size-adjust:100%;}
 
-  .ur-tabs{display:flex;gap:3px;background:var(--s2);border:1px solid var(--b);border-radius:12px;padding:4px;width:fit-content;margin-bottom:22px;}
-  .ur-tab{display:flex;align-items:center;gap:7px;padding:8px 18px;border-radius:8px;border:none;cursor:pointer;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;color:var(--muted);background:transparent;transition:all .2s;}
-  .ur-tab.on{background:var(--s3);color:var(--text);box-shadow:0 2px 10px rgba(0,0,0,.5);}
+  /* bottom nav */
+  .ur-nav{position:fixed;bottom:0;left:0;right:0;background:rgba(20,20,22,.97);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid var(--b2);display:flex;z-index:500;padding-bottom:env(safe-area-inset-bottom);}
+  .ur-nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:10px 4px 8px;border:none;background:transparent;cursor:pointer;color:var(--muted);transition:color .2s;-webkit-tap-highlight-color:transparent;}
+  .ur-nav-btn.on{color:var(--acc);}
+  .ur-nav-btn svg{transition:transform .2s;}
+  .ur-nav-btn.on svg{transform:scale(1.1);}
+  .ur-nav-label{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:1px;text-transform:uppercase;line-height:1;}
+  .ur-nav-dot{width:4px;height:4px;border-radius:50%;background:var(--acc);margin-top:2px;opacity:0;transition:opacity .2s;}
+  .ur-nav-btn.on .ur-nav-dot{opacity:1;}
+  /* push content above nav */
+  .ur-content{padding-bottom:72px;}
 
   .ub{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:9px 16px;border-radius:var(--rs);border:none;font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap;line-height:1;}
   .ub:disabled{opacity:.38;cursor:not-allowed;}
@@ -141,6 +149,9 @@ const IBack    = () => (
     <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
   </svg>
 );
+const IChart   = ({s=15}) => <Ico s={s} d={<><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></>}/>;
+const IRenew   = ({s=15}) => <Ico s={s} d={<><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></>}/>;
+const IWarning = ({s=14}) => <Ico s={s} d={<><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>}/>;
 
 // ─── UI Helpers ───────────────────────────────────────────────
 function Toast({ toasts }) {
@@ -314,9 +325,9 @@ function FormNovoProduto({ produtos, variacoes, onSalvar, onCancelar }) {
   );
 }
 
-function FormNovoUsuario({ setoresCfg, onSalvar, onCancelar }) {
+function FormNovoUsuario({ setoresCfg, onSalvar, onCancelar, onCriarSetor }) {
   const [nome, setNome]   = useState("");
-  const [setor, setSetor] = useState(setoresCfg[0]?.nome||"");
+  const [setor, setSetor] = useState("");
   const [cor, setCor]     = useState(PALETTE[0]);
   const [saving, setSaving]=useState(false);
 
@@ -332,16 +343,12 @@ function FormNovoUsuario({ setoresCfg, onSalvar, onCancelar }) {
       <div style={{height:3,background:"var(--acc)"}}/>
       <div style={{padding:"16px 18px"}}>
         <div style={{fontFamily:"'Syne',sans-serif",fontSize:15,fontWeight:800,color:"var(--acc)",marginBottom:14}}>NOVO USUÁRIO</div>
-        <div className="ugrid2" style={{marginBottom:12}}>
-          <div>
-            <div className="ulbl">Nome *</div>
-            <input className="ui" value={nome} onChange={e=>setNome(e.target.value)} placeholder="Nome completo" autoFocus onKeyDown={e=>e.key==="Enter"&&submit()}/>
-          </div>
-          <div>
-            <div className="ulbl">Setor</div>
-            <input className="ui" list="u-setores" value={setor} onChange={e=>setSetor(e.target.value)} placeholder="Setor..."/>
-            <datalist id="u-setores">{setoresCfg.map(s=><option key={s.id} value={s.nome}/>)}</datalist>
-          </div>
+        <div style={{marginBottom:12}}>
+          <div className="ulbl">Nome *</div>
+          <input className="ui" value={nome} onChange={e=>setNome(e.target.value)} placeholder="Nome completo" autoFocus onKeyDown={e=>e.key==="Enter"&&submit()}/>
+        </div>
+        <div style={{marginBottom:12}}>
+          <SeletorSetor setoresCfg={setoresCfg} value={setor} onChange={setSetor} onCriarSetor={onCriarSetor}/>
         </div>
         <div style={{marginBottom:14}}>
           <div className="ulbl">Cor do avatar</div>
@@ -358,7 +365,7 @@ function FormNovoUsuario({ setoresCfg, onSalvar, onCancelar }) {
   );
 }
 
-function FormEditarUsuario({ usuario, setoresCfg, onSalvar, onCancelar }) {
+function FormEditarUsuario({ usuario, setoresCfg, onSalvar, onCancelar, onCriarSetor }) {
   const [nome, setNome]   = useState(usuario.nome);
   const [setor, setSetor] = useState(usuario.setor||"");
   const [cor, setCor]     = useState(usuario.cor||PALETTE[0]);
@@ -379,16 +386,12 @@ function FormEditarUsuario({ usuario, setoresCfg, onSalvar, onCancelar }) {
           <button className="ub ub-ghost ub-icon ub-sm" onClick={onCancelar}><IX/></button>
         </div>
         <div className="mo-body">
-          <div className="ugrid2" style={{marginBottom:12}}>
-            <div>
-              <div className="ulbl">Nome</div>
-              <input className="ui" value={nome} onChange={e=>setNome(e.target.value)} autoFocus onKeyDown={e=>e.key==="Enter"&&submit()}/>
-            </div>
-            <div>
-              <div className="ulbl">Setor</div>
-              <input className="ui" list="u-setores-edit" value={setor} onChange={e=>setSetor(e.target.value)}/>
-              <datalist id="u-setores-edit">{setoresCfg.map(s=><option key={s.id} value={s.nome}/>)}</datalist>
-            </div>
+          <div style={{marginBottom:12}}>
+            <div className="ulbl">Nome</div>
+            <input className="ui" value={nome} onChange={e=>setNome(e.target.value)} autoFocus onKeyDown={e=>e.key==="Enter"&&submit()}/>
+          </div>
+          <div style={{marginBottom:12}}>
+            <SeletorSetor setoresCfg={setoresCfg} value={setor} onChange={setSetor} onCriarSetor={onCriarSetor||(() => {})}/>
           </div>
           <div style={{marginBottom:16}}>
             <div className="ulbl">Cor</div>
@@ -841,7 +844,7 @@ function TabProdutos({ produtos, variacoes, itens, usuarios, setoresCfg, onRefre
 // TELAS DE USUÁRIO (top-level components)
 // ============================================================
 
-function ListaUsuarios({ usuarios, itens, onSelect, onNovo, showNovo, onCancelNovo, onSalvarNovo, setoresCfg, addToast, onRefresh }) {
+function ListaUsuarios({ usuarios, itens, onSelect, onNovo, showNovo, onCancelNovo, onSalvarNovo, setoresCfg, addToast, onRefresh, onCriarSetor }) {
   const [search, setSearch] = useState("");
   const filtered = usuarios.filter(u=>!search||u.nome.toLowerCase().includes(search.toLowerCase())||(u.setor||"").toLowerCase().includes(search.toLowerCase()));
 
@@ -851,7 +854,7 @@ function ListaUsuarios({ usuarios, itens, onSelect, onNovo, showNovo, onCancelNo
         <div style={{flex:1,minWidth:180}}><SearchInput value={search} onChange={setSearch} placeholder="Buscar usuário ou setor..."/></div>
         <button className="ub ub-acc" onClick={onNovo}><IPlus s={14}/> Novo usuário</button>
       </div>
-      {showNovo && <FormNovoUsuario setoresCfg={setoresCfg} onSalvar={onSalvarNovo} onCancelar={onCancelNovo}/>}
+      {showNovo && <FormNovoUsuario setoresCfg={setoresCfg} onSalvar={onSalvarNovo} onCancelar={onCancelNovo} onCriarSetor={onCriarSetor}/>}
       {usuarios.length>0 && (
         <div style={{display:"flex",gap:8,marginBottom:18,flexWrap:"wrap"}}>
           <div className="ustat"><span className="ustat-n" style={{color:"var(--muted)"}}>{usuarios.length}</span><span className="ustat-l">Usuários</span></div>
@@ -886,32 +889,122 @@ function ListaUsuarios({ usuarios, itens, onSelect, onNovo, showNovo, onCancelNo
   );
 }
 
-function DetalheUsuario({ usuario, itens, variacoes, onVoltar, setoresCfg, addToast, onRefresh }) {
-  const cor = usuario.cor||PALETTE[0];
-  const userItens = itens.filter(i=>i.userId===usuario.id);
-  const [editando, setEditando] = useState(false);
-  const [descartandoId, setDescartandoId] = useState(null);
+// ─── Modal de confirmação com motivo opcional ────────────────
+function ModalConfirm({ titulo, descricao, corAcento="var(--err)", pedirMotivo=false, labelMotivo="Motivo", onConfirm, onCancel, confirmLabel="Confirmar", loading=false }) {
+  const [motivo, setMotivo] = useState("");
+  const ref = React.useRef(null);
+  useEffect(()=>{ ref.current?.focus(); },[]);
+  const ok = !pedirMotivo || motivo.trim().length > 0;
+  return (
+    <div className="mov" onClick={e=>e.target===e.currentTarget&&onCancel()}>
+      <div className="mo ufd" style={{border:`1px solid ${corAcento}44`}}>
+        <div className="mo-head" style={{borderColor:`${corAcento}44`}}>
+          <span className="mo-title" style={{color:corAcento}}>{titulo}</span>
+          <button className="ub ub-ghost ub-icon ub-sm" onClick={onCancel}><IX/></button>
+        </div>
+        <div className="mo-body">
+          {descricao && <div style={{fontSize:13,color:"var(--muted)",marginBottom:16,lineHeight:1.6}}>{descricao}</div>}
+          {pedirMotivo && (
+            <div style={{marginBottom:16}}>
+              <div className="ulbl" style={{marginBottom:6}}>{labelMotivo} *</div>
+              <textarea ref={ref} className="ui" rows={2} value={motivo} onChange={e=>setMotivo(e.target.value)}
+                placeholder="Descreva o motivo..."
+                style={{resize:"vertical",fontFamily:"'Plus Jakarta Sans',sans-serif"}}/>
+            </div>
+          )}
+          <div style={{display:"flex",gap:8}}>
+            <button className="ub ub-full" style={{background:corAcento==="var(--err)"?"rgba(244,63,94,.12)":corAcento==="var(--ok)"?"rgba(34,197,94,.12)":"rgba(56,189,248,.12)",color:corAcento,border:`1px solid ${corAcento}55`}}
+              onClick={()=>onConfirm(motivo)} disabled={loading||!ok}>
+              {loading?<Spin/>:<>{confirmLabel}</>}
+            </button>
+            <button className="ub ub-ghost" onClick={onCancel}>Cancelar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-  const excluir = async () => {
-    if(userItens.length>0){addToast("Usuário tem itens. Devolva primeiro.","error");return;}
-    if(!confirm(`Excluir "${usuario.nome}"?`)) return;
-    await deleteDoc(doc(db,COL.usuarios,usuario.id));
-    await registrarLog("usuario_excluido",`"${usuario.nome}" excluído`);
-    addToast("Excluído.","success"); onVoltar();
+// ─── SeletorSetor — lista de setores + botão criar ────────────
+function SeletorSetor({ setoresCfg, value, onChange, onCriarSetor }) {
+  const [criando, setCriando] = useState(false);
+  const [novoSetor, setNovoSetor] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const ref = React.useRef(null);
+  useEffect(()=>{ if(criando) ref.current?.focus(); },[criando]);
+
+  const criar = async () => {
+    const n = novoSetor.trim();
+    if(!n) return;
+    setSalvando(true);
+    await onCriarSetor(n);
+    onChange(n);
+    setNovoSetor(""); setCriando(false); setSalvando(false);
   };
 
-  const devolver = async (item) => {
+  return (
+    <div>
+      <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:8}}>
+        <div className="ulbl" style={{marginBottom:0,flex:1}}>Setor</div>
+        <button className="ub ub-ghost ub-sm" style={{padding:"3px 8px",fontSize:11}} onClick={()=>setCriando(v=>!v)}>
+          <IPlus s={12}/> {criando?"Cancelar":"Novo setor"}
+        </button>
+      </div>
+      {criando ? (
+        <div style={{display:"flex",gap:6}}>
+          <input ref={ref} className="ui" value={novoSetor} onChange={e=>setNovoSetor(e.target.value)}
+            placeholder="Nome do novo setor..." style={{flex:1}}
+            onKeyDown={e=>e.key==="Enter"&&criar()}/>
+          <button className="ub ub-acc ub-sm" onClick={criar} disabled={salvando||!novoSetor.trim()}>
+            {salvando?<Spin/>:<ICheck s={13}/>}
+          </button>
+        </div>
+      ) : (
+        <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+          {setoresCfg.length===0
+            ? <span style={{fontFamily:"var(--mono)",fontSize:11,color:"var(--muted)"}}>Nenhum setor. Clique em "Novo setor".</span>
+            : setoresCfg.map(s=>{
+                const cor=s.cor||PALETTE[0], ativo=value===s.nome;
+                return (
+                  <button key={s.id} onClick={()=>onChange(ativo?"":s.nome)}
+                    style={{padding:"6px 12px",borderRadius:"var(--rs)",border:`2px solid ${ativo?cor:"var(--b2)"}`,background:ativo?`${cor}18`:"transparent",color:ativo?cor:"var(--muted)",cursor:"pointer",fontFamily:"'Plus Jakarta Sans',sans-serif",fontSize:12,fontWeight:600,transition:"all .15s",display:"flex",alignItems:"center",gap:5}}>
+                    <span style={{width:8,height:8,borderRadius:"50%",background:cor,flexShrink:0}}/>{s.nome}
+                  </button>
+                );
+              })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DetalheUsuario({ usuario, itens, variacoes, onVoltar, setoresCfg, addToast, onRefresh, onCriarSetor }) {
+  const cor = usuario.cor||PALETTE[0];
+  const userItens = itens.filter(i=>i.userId===usuario.id);
+  const [editando, setEditando]     = useState(false);
+  const [modalExcluir, setMExcluir] = useState(false);
+  const [devolvendoId, setDevolId]  = useState(null);
+  const [descartandoId, setDescId]  = useState(null);
+
+  const excluirConfirm = async (motivo) => {
+    if(userItens.length>0){addToast("Usuário tem itens atribuídos. Devolva ou descarte primeiro.","error");setMExcluir(false);return;}
+    await deleteDoc(doc(db,COL.usuarios,usuario.id));
+    await registrarLog("usuario_excluido",`"${usuario.nome}" excluído — ${motivo||"sem motivo"}`);
+    addToast("Usuário excluído.","success"); onVoltar();
+  };
+
+  const devolverConfirm = async (item, motivo) => {
     const v=variacoes.find(v=>v.id===item.variacaoId);
     if(v) await updateDoc(doc(db,COL.variacoes,v.id),{quantidade:(v.quantidade||0)+(item.qtd||1)});
     await deleteDoc(doc(db,COL.itens,item.id));
-    await registrarLog("devolucao_estoque",`${item.qtd||1}x "${item.produtoNome}" TAM ${item.tamanho} devolvido de ${usuario.nome}`);
-    addToast("Devolvido ao estoque!","success"); onRefresh();
+    await registrarLog("devolucao_estoque",`${item.qtd||1}x "${item.produtoNome}" TAM ${item.tamanho} devolvido de ${usuario.nome}${motivo?" — "+motivo:""}`);
+    addToast("Devolvido ao estoque!","success"); setDevolId(null); onRefresh();
   };
 
-  const descartar = async (item, motivo) => {
+  const descartarConfirm = async (item, motivo) => {
     await deleteDoc(doc(db,COL.itens,item.id));
     await registrarLog("descarte_usuario",`${item.qtd||1}x "${item.produtoNome}" TAM ${item.tamanho} descartado de ${usuario.nome} — ${motivo}`);
-    addToast("Descartado.","info"); setDescartandoId(null); onRefresh();
+    addToast("Descartado.","info"); setDescId(null); onRefresh();
   };
 
   return (
@@ -930,7 +1023,7 @@ function DetalheUsuario({ usuario, itens, variacoes, onVoltar, setoresCfg, addTo
         </div>
         <div style={{display:"flex",gap:6,flexShrink:0}}>
           <button className="ub ub-ghost ub-sm ub-icon" onClick={()=>setEditando(true)}><IEdit/></button>
-          <button className="ub ub-err ub-sm ub-icon" onClick={excluir}><ITrash/></button>
+          <button className="ub ub-err ub-sm ub-icon" onClick={()=>setMExcluir(true)}><ITrash/></button>
         </div>
       </div>
 
@@ -940,7 +1033,6 @@ function DetalheUsuario({ usuario, itens, variacoes, onVoltar, setoresCfg, addTo
         ? <div style={{fontFamily:"var(--mono)",fontSize:12,color:"var(--muted)",padding:"24px",textAlign:"center",border:"1px dashed var(--b)",borderRadius:"var(--rs)"}}>Nenhum uniforme atribuído.</div>
         : userItens.map(item=>{
             const icor=item.cor||PALETTE[0];
-            const descartando=descartandoId===item.id;
             return (
               <div key={item.id} style={{background:"var(--s2)",border:"1px solid var(--b)",borderRadius:"var(--r)",marginBottom:10,overflow:"hidden"}}>
                 <div style={{height:3,background:icor}}/>
@@ -955,25 +1047,43 @@ function DetalheUsuario({ usuario, itens, variacoes, onVoltar, setoresCfg, addTo
                     </div>
                     <div style={{fontFamily:"'Syne',sans-serif",fontSize:28,fontWeight:800,color:"var(--info)",flexShrink:0}}>×{item.qtd||1}</div>
                   </div>
-                  {!descartando
-                    ? (
+                  {devolvendoId===item.id
+                    ? <AcaoDescartarItem key={`dev-${item.id}`} item={item}
+                        onConfirm={motivo=>devolverConfirm(item,motivo)} onCancel={()=>setDevolId(null)}/>
+                    : descartandoId===item.id
+                    ? <AcaoDescartarItem key={`desc-${item.id}`} item={item}
+                        onConfirm={motivo=>descartarConfirm(item,motivo)} onCancel={()=>setDescId(null)}/>
+                    : (
                       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                        <button className="ub ub-ok ub-full" onClick={()=>devolver(item)}><IRefresh s={15}/> Devolver ao estoque</button>
-                        <button className="ub ub-err ub-full" onClick={()=>setDescartandoId(item.id)}><ITrash s={15}/> Descartar</button>
+                        <button className="ub ub-ok ub-full" onClick={()=>setDevolId(item.id)}><IRefresh s={15}/> Devolver ao estoque</button>
+                        <button className="ub ub-err ub-full" onClick={()=>setDescId(item.id)}><ITrash s={15}/> Descartar</button>
                       </div>
-                    )
-                    : <AcaoDescartarItem key={`disc-${item.id}`} item={item} onConfirm={motivo=>descartar(item,motivo)} onCancel={()=>setDescartandoId(null)}/>}
+                    )}
                 </div>
               </div>
             );
           })}
 
       {editando && (
-        <FormEditarUsuario usuario={usuario} setoresCfg={setoresCfg} onCancelar={()=>setEditando(false)} onSalvar={async({nome,setor,cor})=>{
-          await updateDoc(doc(db,COL.usuarios,usuario.id),{nome,setor,cor});
-          await registrarLog("usuario_editado",`"${usuario.nome}" → "${nome}"`);
-          addToast("Atualizado!","success"); setEditando(false); onRefresh();
-        }}/>
+        <FormEditarUsuario usuario={usuario} setoresCfg={setoresCfg} onCriarSetor={onCriarSetor}
+          onCancelar={()=>setEditando(false)} onSalvar={async({nome,setor,cor})=>{
+            await updateDoc(doc(db,COL.usuarios,usuario.id),{nome,setor,cor});
+            await registrarLog("usuario_editado",`"${usuario.nome}" → "${nome}"`);
+            addToast("Atualizado!","success"); setEditando(false); onRefresh();
+          }}/>
+      )}
+
+      {modalExcluir && (
+        <ModalConfirm
+          titulo="Excluir usuário"
+          descricao={`Tem certeza que deseja excluir "${usuario.nome}"? Esta ação não pode ser desfeita.`}
+          corAcento="var(--err)"
+          pedirMotivo={true}
+          labelMotivo="Motivo da exclusão"
+          confirmLabel="Excluir usuário"
+          onConfirm={excluirConfirm}
+          onCancel={()=>setMExcluir(false)}
+        />
       )}
     </div>
   );
@@ -990,28 +1100,148 @@ function TabUsuarios({ usuarios, itens, variacoes, produtos, setoresCfg, onRefre
   const irUser  = (u) => { setSelUser(u); setPagina("usuario"); };
   const irLista = ()  => { setSelUser(null); setPagina("lista"); setShowNovo(false); };
 
+  const criarSetor = async (nome) => {
+    if(setoresCfg.some(x=>x.nome.toLowerCase()===nome.toLowerCase())) return;
+    await addDoc(collection(db,COL.setores),{nome,cor:PALETTE[Math.floor(Math.random()*PALETTE.length)],criadoEm:serverTimestamp()});
+    onRefresh();
+  };
+
   const salvarNovoUsuario = async ({ nome, setor, cor }) => {
     if(usuarios.some(u=>u.nome.toLowerCase()===nome.toLowerCase())){addToast("Usuário já existe.","error");return;}
     if(setor&&!setoresCfg.some(x=>x.nome.toLowerCase()===setor.toLowerCase())){
       await addDoc(collection(db,COL.setores),{nome:setor,cor,criadoEm:serverTimestamp()});
     }
     await addDoc(collection(db,COL.usuarios),{nome,setor,cor,criadoEm:serverTimestamp()});
-    await registrarLog("usuario_criado",`"${nome}" (${setor}) criado`);
+    await registrarLog("usuario_criado",`"${nome}" (${setor||"sem setor"}) criado`);
     addToast(`"${nome}" criado!`,"success");
     setShowNovo(false); onRefresh();
   };
 
   if (pagina==="usuario" && selUser) return (
     <DetalheUsuario usuario={selUser} itens={itens} variacoes={variacoes} setoresCfg={setoresCfg}
-      onVoltar={irLista} addToast={addToast}
+      onVoltar={irLista} addToast={addToast} onCriarSetor={criarSetor}
       onRefresh={()=>{ onRefresh(); setSelUser(u=>{ const up=usuarios.find(x=>x.id===u?.id); return up||null; }); }}/>
   );
 
   return (
     <ListaUsuarios usuarios={usuarios} itens={itens} setoresCfg={setoresCfg}
       onSelect={irUser} onNovo={()=>setShowNovo(v=>!v)}
-      showNovo={showNovo} onCancelNovo={()=>setShowNovo(false)} onSalvarNovo={salvarNovoUsuario}
+      showNovo={showNovo} onCancelNovo={()=>setShowNovo(false)}
+      onSalvarNovo={salvarNovoUsuario} onCriarSetor={criarSetor}
       addToast={addToast} onRefresh={onRefresh}/>
+  );
+}
+
+// ============================================================
+// TAB ANALYTICS
+// ============================================================
+function TabAnalytics({ produtos, variacoes, itens }) {
+  const totalEstoque = variacoes.reduce((s,v)=>s+(v.quantidade||0),0);
+  const totalAtrib   = itens.reduce((s,i)=>s+(i.qtd||1),0);
+  const totalGeral   = totalEstoque + totalAtrib;
+
+  // Por produto: agrupa variações e itens
+  const porProduto = produtos.map(p=>{
+    const vars = variacoes.filter(v=>v.produtoId===p.id);
+    const estoque = vars.reduce((s,v)=>s+(v.quantidade||0),0);
+    const atrib   = itens.filter(i=>i.produtoId===p.id).reduce((s,i)=>s+(i.qtd||1),0);
+    const total   = estoque + atrib;
+    const cor     = p.cor||PALETTE[0];
+    return { ...p, estoque, atrib, total, cor, vars };
+  }).sort((a,b)=>b.total-a.total);
+
+  const Bar = ({ value, max, cor }) => {
+    const pct = max>0 ? Math.round((value/max)*100) : 0;
+    return (
+      <div style={{height:6,background:"var(--s3)",borderRadius:3,overflow:"hidden",flex:1}}>
+        <div style={{height:"100%",width:`${pct}%`,background:cor,borderRadius:3,transition:"width .4s ease"}}/>
+      </div>
+    );
+  };
+
+  return (
+    <div>
+      {/* Cards totais */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(140px,1fr))",gap:10,marginBottom:24}}>
+        {[
+          {l:"Total geral",   v:totalGeral,   c:"var(--text)",  sub:"peças registradas"},
+          {l:"Em estoque",    v:totalEstoque, c:"var(--ok)",    sub:"disponíveis"},
+          {l:"Atribuídos",    v:totalAtrib,   c:"var(--info)",  sub:"com usuários"},
+          {l:"Produtos",      v:produtos.length, c:"var(--acc)", sub:"tipos diferentes"},
+        ].map(s=>(
+          <div key={s.l} style={{background:"var(--s1)",border:"1px solid var(--b)",borderRadius:"var(--r)",padding:"14px 16px"}}>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:9,color:"var(--muted)",letterSpacing:2,textTransform:"uppercase",marginBottom:6}}>{s.l}</div>
+            <div style={{fontFamily:"'Syne',sans-serif",fontSize:36,fontWeight:800,lineHeight:1,color:s.c,marginBottom:4}}>{s.v}</div>
+            <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:"var(--muted)"}}>{s.sub}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Por produto */}
+      <div className="usec">Por produto</div>
+      {porProduto.length===0
+        ? <div className="uempty"><IChart s={32}/><div style={{marginTop:12}}>Nenhum produto cadastrado.</div></div>
+        : porProduto.map(p=>(
+          <div key={p.id} style={{background:"var(--s1)",border:"1px solid var(--b)",borderRadius:"var(--r)",marginBottom:10,overflow:"hidden"}}>
+            <div style={{height:3,background:p.cor}}/>
+            <div style={{padding:"14px 16px"}}>
+              {/* Nome + números */}
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:10,flexWrap:"wrap"}}>
+                <div style={{fontFamily:"'Syne',sans-serif",fontSize:15,fontWeight:800,flex:1,minWidth:120}}>{p.nome}</div>
+                <div style={{display:"flex",gap:16,flexShrink:0}}>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:9,color:"var(--ok)",letterSpacing:1,textTransform:"uppercase"}}>Estoque</div>
+                    <div style={{fontFamily:"'Syne',sans-serif",fontSize:22,fontWeight:800,color:"var(--ok)",lineHeight:1}}>{p.estoque}</div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:9,color:"var(--info)",letterSpacing:1,textTransform:"uppercase"}}>Atribuído</div>
+                    <div style={{fontFamily:"'Syne',sans-serif",fontSize:22,fontWeight:800,color:"var(--info)",lineHeight:1}}>{p.atrib}</div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:9,color:"var(--muted)",letterSpacing:1,textTransform:"uppercase"}}>Total</div>
+                    <div style={{fontFamily:"'Syne',sans-serif",fontSize:22,fontWeight:800,color:p.cor,lineHeight:1}}>{p.total}</div>
+                  </div>
+                </div>
+              </div>
+              {/* Barra estoque vs atribuído */}
+              {p.total>0 && (
+                <div style={{marginBottom:10}}>
+                  <div style={{height:8,borderRadius:4,overflow:"hidden",background:"var(--s3)",display:"flex"}}>
+                    <div style={{height:"100%",width:`${Math.round((p.estoque/p.total)*100)}%`,background:"var(--ok)",transition:"width .4s"}}/>
+                    <div style={{height:"100%",width:`${Math.round((p.atrib/p.total)*100)}%`,background:"var(--info)",transition:"width .4s"}}/>
+                  </div>
+                  <div style={{display:"flex",gap:12,marginTop:4}}>
+                    <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:9,color:"var(--ok)",display:"flex",alignItems:"center",gap:4}}>
+                      <span style={{width:6,height:6,borderRadius:"50%",background:"var(--ok)",display:"inline-block"}}/>
+                      Estoque {p.total>0?Math.round((p.estoque/p.total)*100):0}%
+                    </span>
+                    <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:9,color:"var(--info)",display:"flex",alignItems:"center",gap:4}}>
+                      <span style={{width:6,height:6,borderRadius:"50%",background:"var(--info)",display:"inline-block"}}/>
+                      Atribuído {p.total>0?Math.round((p.atrib/p.total)*100):0}%
+                    </span>
+                  </div>
+                </div>
+              )}
+              {/* Por tamanho */}
+              {p.vars.length>0 && (
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  {p.vars.map(v=>{
+                    const atribV=itens.filter(i=>i.variacaoId===v.id).reduce((s,i)=>s+(i.qtd||1),0);
+                    const totalV=(v.quantidade||0)+atribV;
+                    return (
+                      <div key={v.id} style={{background:"var(--s2)",border:`1px solid ${p.cor}33`,borderRadius:"var(--rs)",padding:"6px 10px",minWidth:70}}>
+                        <div style={{fontFamily:"'Syne',sans-serif",fontSize:13,fontWeight:800,color:p.cor,marginBottom:2}}>{v.tamanho}</div>
+                        <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:9,color:"var(--ok)"}}>est: {v.quantidade||0}</div>
+                        <div style={{fontFamily:"'JetBrains Mono',monospace",fontSize:9,color:"var(--info)"}}>atr: {atribV}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+    </div>
   );
 }
 
@@ -1062,9 +1292,11 @@ function TabLog() {
 // MODAL RENOVAR
 // ============================================================
 function ModalRenovar({ onClose, onConfirm, renovando }) {
-  const [pin, setPin] = useState("");
-  const ref = React.useRef(null);
-  useEffect(()=>{ ref.current?.focus(); },[]);
+  const [pin, setPin]       = useState("");
+  const [motivo, setMotivo] = useState("");
+  const pinRef = React.useRef(null);
+  useEffect(()=>{ pinRef.current?.focus(); },[]);
+  const ok = pin==="4510" && motivo.trim().length>0;
   return (
     <div className="mov" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="mo ufd" style={{border:"1px solid var(--err)"}}>
@@ -1079,17 +1311,22 @@ function ModalRenovar({ onClose, onConfirm, renovando }) {
             · Itens atribuídos · Setores · Log<br/>
             <strong>Só afeta o módulo Uniformes.</strong>
           </div>
+          <div style={{marginBottom:12}}>
+            <div className="ulbl" style={{marginBottom:6}}>Motivo da renovação *</div>
+            <textarea className="ui" rows={2} value={motivo} onChange={e=>setMotivo(e.target.value)}
+              placeholder="Ex: início de temporada, troca de coleção..." style={{resize:"none"}}/>
+          </div>
           <div style={{marginBottom:16}}>
-            <div className="ulbl" style={{marginBottom:8}}>Digite a senha para confirmar</div>
-            <input ref={ref} className="ui" type="password" inputMode="numeric" maxLength={4}
+            <div className="ulbl" style={{marginBottom:8}}>Senha de confirmação</div>
+            <input ref={pinRef} className="ui" type="password" inputMode="numeric" maxLength={4}
               value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,"").slice(0,4))}
-              onKeyDown={e=>e.key==="Enter"&&pin==="4510"&&onConfirm()}
+              onKeyDown={e=>e.key==="Enter"&&ok&&onConfirm(motivo)}
               placeholder="••••"
               style={{textAlign:"center",fontFamily:"'Syne',sans-serif",fontSize:28,fontWeight:800,letterSpacing:12,maxWidth:160}}/>
-            {pin.length===4&&pin!=="4510"&&<div style={{fontFamily:"var(--mono)",fontSize:11,color:"var(--err)",marginTop:8,display:"flex",alignItems:"center",gap:6}}><span>⚠</span> Senha incorreta.</div>}
+            {pin.length===4&&pin!=="4510"&&<div style={{fontFamily:"var(--mono)",fontSize:11,color:"var(--err)",marginTop:6,display:"flex",alignItems:"center",gap:6}}><IWarning s={12}/> Senha incorreta.</div>}
           </div>
           <div style={{display:"flex",gap:8}}>
-            <button className="ub ub-err ub-full" onClick={onConfirm} disabled={renovando||pin!=="4510"}>
+            <button className="ub ub-err ub-full" onClick={()=>onConfirm(motivo)} disabled={renovando||!ok}>
               {renovando?<><Spin/> Zerando...</>:<><IRefresh s={14}/> Renovar tudo</>}
             </button>
             <button className="ub ub-ghost" onClick={onClose}>Cancelar</button>
@@ -1136,7 +1373,7 @@ export function Uniformes() {
 
   useEffect(()=>{ load(); },[]);
 
-  const renovarTudo = async () => {
+  const renovarTudo = async (motivo) => {
     setRenovando(true);
     try {
       for(const col of Object.values(COL)){
@@ -1144,6 +1381,8 @@ export function Uniformes() {
         const batch=writeBatch(db); snap.docs.forEach(d=>batch.delete(d.ref));
         if(snap.docs.length>0) await batch.commit();
       }
+      // Log antes de limpar (já foi limpo, então criamos novo)
+      await addDoc(collection(db,COL.log),{acao:"renovacao",desc:`Sistema renovado — ${motivo}`,ts:serverTimestamp()});
       addToast("Banco de uniformes zerado!","success");
       setShowRenovar(false); load();
     } catch(e){ addToast("Erro: "+e.message,"error"); }
@@ -1153,7 +1392,7 @@ export function Uniformes() {
   const totalEst   = variacoes.reduce((s,v)=>s+(v.quantidade||0),0);
   const totalAtrib = itens.reduce((s,i)=>s+(i.qtd||1),0);
 
-  const TABS = [{id:"produtos",l:"Produtos",I:IBox},{id:"usuarios",l:"Usuários",I:IUsers},{id:"log",l:"Log",I:ILog}];
+  const TABS = [{id:"produtos",l:"Produtos",I:IBox},{id:"usuarios",l:"Usuários",I:IUsers},{id:"analytics",l:"Analytics",I:IChart},{id:"log",l:"Log",I:ILog},{id:"renovar",l:"Renovar",I:IRenew}];
 
   return (
     <div className="ur">
@@ -1172,29 +1411,37 @@ export function Uniformes() {
               <span className="ustat-l">{s.l}</span>
             </div>
           ))}
-          <button className="ub ub-err ub-sm" onClick={()=>setShowRenovar(true)}><IRefresh s={13}/> Renovar</button>
+
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="ur-tabs">
-        {TABS.map(t=>(
-          <button key={t.id} className={`ur-tab${tab===t.id?" on":""}`} onClick={()=>setTab(t.id)}>
-            <t.I s={15}/> {t.l}
-          </button>
-        ))}
+      {/* Conteúdo */}
+      <div className="ur-content">
+        {loading
+          ? <div className="uempty"><Spin/></div>
+          : (
+            <div className="ufd">
+              {tab==="produtos"  &&<TabProdutos produtos={produtos} variacoes={variacoes} itens={itens} usuarios={usuarios} setoresCfg={setoresCfg} onRefresh={load} addToast={addToast}/>}
+              {tab==="usuarios"  &&<TabUsuarios usuarios={usuarios} itens={itens} variacoes={variacoes} produtos={produtos} setoresCfg={setoresCfg} onRefresh={load} addToast={addToast}/>}
+              {tab==="analytics" &&<TabAnalytics produtos={produtos} variacoes={variacoes} itens={itens}/>}
+              {tab==="log"       &&<TabLog/>}
+              {tab==="renovar"   &&<div className="uempty" style={{paddingTop:80}}><IRenew s={40}/><div style={{marginTop:16,fontSize:14}}>Clique no botão abaixo para renovar o banco de uniformes.</div><button className="ub ub-err" style={{marginTop:20}} onClick={()=>setShowRenovar(true)}><IRenew s={15}/> Abrir renovação</button></div>}
+            </div>
+          )}
       </div>
 
-      {/* Conteúdo */}
-      {loading
-        ? <div className="uempty"><Spin/></div>
-        : (
-          <div className="ufd">
-            {tab==="produtos"&&<TabProdutos produtos={produtos} variacoes={variacoes} itens={itens} usuarios={usuarios} setoresCfg={setoresCfg} onRefresh={load} addToast={addToast}/>}
-            {tab==="usuarios"&&<TabUsuarios usuarios={usuarios} itens={itens} variacoes={variacoes} produtos={produtos} setoresCfg={setoresCfg} onRefresh={load} addToast={addToast}/>}
-            {tab==="log"&&<TabLog/>}
-          </div>
-        )}
+      {/* Bottom nav */}
+      <nav className="ur-nav">
+        {TABS.map(t=>(
+          <button key={t.id}
+            className={`ur-nav-btn${tab===t.id?" on":""}`}
+            onClick={()=>{ if(t.id==="renovar"){ setShowRenovar(true); } else { setTab(t.id); } }}>
+            <t.I s={22}/>
+            <span className="ur-nav-label">{t.l}</span>
+            <span className="ur-nav-dot"/>
+          </button>
+        ))}
+      </nav>
 
       {showRenovar&&<ModalRenovar onClose={()=>setShowRenovar(false)} onConfirm={renovarTudo} renovando={renovando}/>}
       <Toast toasts={toasts}/>
