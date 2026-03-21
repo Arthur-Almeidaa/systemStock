@@ -183,6 +183,17 @@ const CSS = `
   .ustat-n{font-family:'Syne',sans-serif;font-size:21px;font-weight:700;line-height:1;}
   .ustat-l{font-family:'JetBrains Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);}
 
+  /* Back button nav */
+  .u-back{display:inline-flex;align-items:center;gap:7px;padding:8px 14px;background:var(--s2);border:1px solid var(--b2);border-radius:var(--rs);font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;transition:all .2s;margin-bottom:18px;}
+  .u-back:hover{color:var(--text);border-color:var(--b2);background:var(--s3);}
+  .u-page-title{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;margin-bottom:6px;line-height:1.2;}
+  .u-page-sub{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);margin-bottom:20px;}
+  .u-breadcrumb{display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-bottom:16px;flex-wrap:wrap;}
+  .u-breadcrumb span{cursor:pointer;transition:color .15s;}
+  .u-breadcrumb span:hover{color:var(--text);}
+  .u-breadcrumb .sep{color:var(--dim);}
+  .u-breadcrumb .cur{color:var(--text);cursor:default;}
+
   @keyframes usl{from{transform:translateX(16px);opacity:0}to{transform:translateX(0);opacity:1}}
   @keyframes ufd{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
   .ufd{animation:ufd .18s ease;}
@@ -263,7 +274,36 @@ function Modal({ title, onClose, children, accentColor }) {
   );
 }
 
-// ─── Drawer ───────────────────────────────────────────────────
+// ─── BackButton ───────────────────────────────────────────────
+function BackBtn({ onClick, label="Voltar" }) {
+  return (
+    <button className="u-back" onClick={onClick}>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0}}>
+        <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+      </svg>
+      {label}
+    </button>
+  );
+}
+
+// ─── Breadcrumb ───────────────────────────────────────────────
+function Breadcrumb({ items }) {
+  // items = [{label, onClick}]  last item has no onClick (current)
+  return (
+    <div className="u-breadcrumb">
+      {items.map((item, i) => (
+        <span key={i} style={{display:"flex",alignItems:"center",gap:6}}>
+          {i > 0 && <span className="sep">›</span>}
+          {item.onClick
+            ? <span onClick={item.onClick}>{item.label}</span>
+            : <span className="cur">{item.label}</span>}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// Drawer mantido apenas para compatibilidade (não usado mais)
 function Drawer({ open, onClose, title, sub, children }) {
   if (!open) return null;
   return (
@@ -539,8 +579,9 @@ function TabProdutos({ produtos, variacoes, itens, usuarios, setoresCfg, onRefre
     !userSearch || u.nome.toLowerCase().includes(userSearch.toLowerCase())
   );
 
-  return (
-    <div>
+  // Página: lista de produtos
+  const PaginaLista = () => (
+    <div className="ufd">
       {/* Barra */}
       <div style={{ display:"flex", gap:10, marginBottom:18, alignItems:"center", flexWrap:"wrap" }}>
         <div style={{ flex:1, minWidth:180 }}><Search value={search} onChange={setSearch} placeholder="Buscar produto..."/></div>
@@ -697,147 +738,189 @@ function TabProdutos({ produtos, variacoes, itens, usuarios, setoresCfg, onRefre
           </div>
         )}
 
-      {/* Drawer do produto — lista de tamanhos */}
-      <Drawer open={!!selProd} onClose={() => { setSelProd(null); setSelVar(null); setModalAcao(null); }}
-        title={selProd?.nome || ""} sub={`${variacoesDoProd.length} tamanho${variacoesDoProd.length!==1?"s":""} · ${variacoesDoProd.reduce((s,v)=>s+(v.quantidade||0),0)} em estoque`}>
-        {selProd && (
+    </div>
+  );
+
+  // ── Página: detalhe do produto (lista de tamanhos) ──
+  const PaginaProduto = () => {
+    const cor = selProd?.cor || PALETTE[0];
+    return (
+      <div className="ufd">
+        <Breadcrumb items={[
+          { label:"Produtos", onClick:()=>{ setSelProd(null); setSelVar(null); setModalAcao(null); } },
+          { label:selProd?.nome || "" },
+        ]}/>
+        <BackBtn onClick={()=>{ setSelProd(null); setSelVar(null); setModalAcao(null); }} label="Voltar para produtos"/>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:16, flexWrap:"wrap", gap:8 }}>
           <div>
-            <div className="usec">Tamanhos disponíveis</div>
+            <div className="u-page-title" style={{ color:cor }}>{selProd?.nome}</div>
+            <div className="u-page-sub">
+              {variacoesDoProd.length} tamanho{variacoesDoProd.length!==1?"s":""} · {variacoesDoProd.reduce((s,v)=>s+(v.quantidade||0),0)} em estoque
+            </div>
+          </div>
+          <div style={{ display:"flex", gap:6 }}>
+            <button className="ub ub-ghost ub-sm" onClick={()=>{ setEditP(selProd); setEditNome(selProd.nome); setEditCor(selProd.cor||PALETTE[0]); }}>
+              <Icon n="edit" s={13}/> Editar
+            </button>
+            <button className="ub ub-err ub-sm" onClick={()=>excluirProduto(selProd)}>
+              <Icon n="trash" s={13}/> Excluir
+            </button>
+          </div>
+        </div>
+        <div className="usec">Tamanhos disponíveis</div>
+        {variacoesDoProd.length === 0
+          ? <div style={{ fontFamily:"var(--mono)", fontSize:12, color:"var(--muted)", padding:"20px", textAlign:"center", border:"1px dashed var(--b)", borderRadius:"var(--rs)" }}>Nenhum tamanho cadastrado.</div>
+          : variacoesDoProd.map(v => (
+            <div key={v.id} onClick={()=>abrirVar(v)}
+              style={{ display:"flex", alignItems:"center", gap:14, padding:"14px 16px", background:"var(--s2)", border:`1px solid var(--b)`, borderRadius:"var(--rs)", marginBottom:8, cursor:"pointer", transition:"all .15s" }}
+              onMouseEnter={e=>{ e.currentTarget.style.borderColor=cor+"88"; e.currentTarget.style.background=`${cor}08`; }}
+              onMouseLeave={e=>{ e.currentTarget.style.borderColor="var(--b)"; e.currentTarget.style.background="var(--s2)"; }}>
+              <div style={{ fontFamily:"'Syne',sans-serif", fontSize:26, fontWeight:800, color:cor, minWidth:56, lineHeight:1 }}>{v.tamanho}</div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:"var(--muted)", letterSpacing:2, textTransform:"uppercase", marginBottom:3 }}>em estoque</div>
+                <div style={{ fontFamily:"'Syne',sans-serif", fontSize:32, fontWeight:800, lineHeight:1, color:v.quantidade>0?cor:"var(--err)" }}>{v.quantidade||0}</div>
+              </div>
+              <div style={{ display:"flex", gap:5, flexShrink:0 }} onClick={e=>e.stopPropagation()}>
+                <button className="ub ub-ghost ub-icon ub-sm" title="Editar" onClick={()=>{ setEditV(v); setEditTam(v.tamanho); setEditQtd(String(v.quantidade||0)); }}>
+                  <Icon n="edit" s={12}/>
+                </button>
+                <button className="ub ub-err ub-icon ub-sm" title="Excluir" onClick={()=>excluirVariacao(v)}>
+                  <Icon n="trash" s={12}/>
+                </button>
+              </div>
+              <Icon n="chevron" s={14} c="var(--dim)"/>
+            </div>
+          ))}
+      </div>
+    );
+  };
 
-            {variacoesDoProd.length === 0
-              ? <div style={{ fontFamily:"var(--mono)", fontSize:12, color:"var(--muted)", padding:"16px 0", textAlign:"center" }}>Nenhum tamanho cadastrado.</div>
-              : variacoesDoProd.map(v => {
-                  const cor    = selProd.cor || PALETTE[0];
-                  const isSelV = selVar?.id === v.id;
-                  return (
-                    <div key={v.id}>
-                      <div onClick={() => { abrirVar(isSelV ? null : v); }}
-                        style={{ display:"flex", alignItems:"center", gap:12, padding:"12px 14px", background:isSelV?`${cor}10`:"var(--s2)", border:`1px solid ${isSelV?cor:"var(--b)"}`, borderRadius:"var(--rs)", marginBottom:6, cursor:"pointer", transition:"all .15s" }}>
-                        {/* Tamanho */}
-                        <div style={{ fontFamily:"'Syne',sans-serif", fontSize:22, fontWeight:800, color:cor, minWidth:44, lineHeight:1 }}>{v.tamanho}</div>
-                        {/* Quantidade */}
-                        <div style={{ flex:1 }}>
-                          <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:"var(--muted)", letterSpacing:2, textTransform:"uppercase", marginBottom:2 }}>em estoque</div>
-                          <div style={{ fontFamily:"'Syne',sans-serif", fontSize:28, fontWeight:800, lineHeight:1, color:v.quantidade>0?cor:"var(--err)" }}>{v.quantidade||0}</div>
-                        </div>
-                        {/* Ações rápidas */}
-                        <div style={{ display:"flex", gap:5, flexShrink:0 }} onClick={e=>e.stopPropagation()}>
-                          <button className="ub ub-ghost ub-icon ub-sm" title="Editar tamanho" onClick={()=>{ setEditV(v); setEditTam(v.tamanho); setEditQtd(String(v.quantidade||0)); }}>
-                            <Icon n="edit" s={12}/>
-                          </button>
-                          <button className="ub ub-err ub-icon ub-sm" title="Excluir tamanho" onClick={()=>excluirVariacao(v)}>
-                            <Icon n="trash" s={12}/>
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Painel de ações quando a variação está selecionada */}
-                      {isSelV && (
-                        <div className="ufd" style={{ marginBottom:8, padding:"14px", background:"var(--s1)", border:`1px solid ${cor}33`, borderRadius:"var(--rs)", borderTop:"none", borderTopLeftRadius:0, borderTopRightRadius:0, marginTop:-6 }}>
-                          {/* Botões de ação */}
-                          <div style={{ display:"flex", gap:6, marginBottom:14 }}>
-                            {[
-                              { id:"adicionar", l:"+ Estoque",  cls:"ub-ok"   },
-                              { id:"enviar",    l:"→ Usuário",  cls:"ub-info" },
-                              { id:"descartar", l:"✕ Descartar",cls:"ub-err"  },
-                            ].map(a => (
-                              <button key={a.id} className={`ub ${a.cls} ub-sm`}
-                                style={{ flex:1, justifyContent:"center", outline:modalAcao===a.id?"2px solid currentColor":"none", outlineOffset:2 }}
-                                onClick={() => setModalAcao(modalAcao===a.id ? null : a.id)}>
-                                {a.l}
-                              </button>
-                            ))}
-                          </div>
-
-                          {/* ADICIONAR AO ESTOQUE */}
-                          {modalAcao === "adicionar" && (
-                            <div className="ufd">
-                              <div className="ulbl" style={{ marginBottom:6 }}>Quantas unidades chegaram?</div>
-                              <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                                <input className="ui ui-num" type="number" min="1" value={aqtd} onChange={e=>setAQtd(e.target.value.replace(/[^0-9]/g,""))}
-                                  placeholder="0" style={{ flex:1 }} onKeyDown={e=>e.key==="Enter"&&adicionarEstoque()}/>
-                                {aqtd && parseInt(aqtd) > 0 && (
-                                  <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:11, color:"var(--ok)", whiteSpace:"nowrap" }}>
-                                    {v.quantidade||0} + {aqtd} = <strong>{(v.quantidade||0)+parseInt(aqtd)}</strong>
-                                  </div>
-                                )}
-                              </div>
-                              <button className="ub ub-ok ub-full" style={{ marginTop:10 }} onClick={adicionarEstoque} disabled={savingAcao||!aqtd||parseInt(aqtd)<1}>
-                                {savingAcao?<Spin/>:<><Icon n="plus" s={13}/> Adicionar {aqtd||0} ao estoque</>}
-                              </button>
-                            </div>
-                          )}
-
-                          {/* ENVIAR PARA USUÁRIO */}
-                          {modalAcao === "enviar" && (
-                            <div className="ufd">
-                              {(v.quantidade||0) === 0
-                                ? <div style={{ fontFamily:"var(--mono)", fontSize:12, color:"var(--err)", display:"flex", alignItems:"center", gap:7 }}><Icon n="warn" s={13} c="var(--err)"/> Estoque zerado.</div>
-                                : <>
-                                    <div style={{ display:"flex", gap:8, marginBottom:10, alignItems:"flex-end" }}>
-                                      <div style={{ width:80 }}>
-                                        <div className="ulbl">Qtd</div>
-                                        <input className="ui ui-num" type="number" min="1" max={v.quantidade} value={sendQtd} onChange={e=>setSendQtd(e.target.value.replace(/[^0-9]/g,""))} style={{ padding:"6px 8px" }}/>
-                                      </div>
-                                      <div style={{ flex:1 }}>
-                                        <div className="ulbl">Usuário</div>
-                                        <Search value={userSearch} onChange={setUSearch} placeholder="Buscar..."/>
-                                      </div>
-                                    </div>
-                                    <div style={{ maxHeight:190, overflowY:"auto", border:"1px solid var(--b)", borderRadius:"var(--rs)", marginBottom:10 }}>
-                                      {[...usersFiltered].sort((a,b)=>a.nome.localeCompare(b.nome)).map(u => {
-                                        const uc = u.cor||PALETTE[0];
-                                        return (
-                                          <div key={u.id} onClick={()=>setSendUser(u.id)}
-                                            style={{ display:"flex", alignItems:"center", gap:9, padding:"9px 11px", cursor:"pointer", borderBottom:"1px solid var(--b)", background:sendUser===u.id?"rgba(56,189,248,.08)":"transparent", transition:"background .1s" }}>
-                                            <div style={{ width:28,height:28,borderRadius:"50%",background:`${uc}22`,border:`2px solid ${uc}44`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
-                                              <span style={{ fontFamily:"'Syne',sans-serif",fontSize:13,fontWeight:800,color:uc }}>{u.nome.charAt(0)}</span>
-                                            </div>
-                                            <span style={{ flex:1,fontSize:12,fontWeight:600,color:sendUser===u.id?"var(--info)":"var(--text)" }}>{u.nome}</span>
-                                            {u.setor && <SetorChip setor={u.setor} cor={u.cor}/>}
-                                            {sendUser===u.id && <Icon n="check" s={13} c="var(--info)"/>}
-                                          </div>
-                                        );
-                                      })}
-                                      {usersFiltered.length===0&&<div style={{ padding:10,fontSize:11,color:"var(--muted)",fontFamily:"var(--mono)" }}>Nenhum usuário</div>}
-                                    </div>
-                                    <button className="ub ub-info ub-full" onClick={enviarParaUser} disabled={savingAcao||!sendUser||!parseInt(sendQtd)}>
-                                      {savingAcao?<Spin/>:<><Icon n="send" s={13}/> Enviar {sendQtd||0}x</>}
-                                    </button>
-                                  </>}
-                            </div>
-                          )}
-
-                          {/* DESCARTAR */}
-                          {modalAcao === "descartar" && (
-                            <div className="ufd">
-                              {(v.quantidade||0) === 0
-                                ? <div style={{ fontFamily:"var(--mono)",fontSize:12,color:"var(--err)",display:"flex",alignItems:"center",gap:7 }}><Icon n="warn" s={13} c="var(--err)"/> Estoque zerado.</div>
-                                : <>
-                                    <div style={{ display:"flex", gap:8, marginBottom:10, alignItems:"flex-end" }}>
-                                      <div style={{ width:80 }}>
-                                        <div className="ulbl">Qtd</div>
-                                        <input className="ui ui-num" type="number" min="1" max={v.quantidade} value={discQtd} onChange={e=>setDiscQtd(e.target.value.replace(/[^0-9]/g,""))} style={{ padding:"6px 8px" }}/>
-                                      </div>
-                                      <div style={{ flex:1 }}>
-                                        <div className="ulbl">Motivo *</div>
-                                        <input className="ui" value={discMotivo} onChange={e=>setDiscM(e.target.value)} placeholder="Ex: rasgado, danificado..." onKeyDown={e=>e.key==="Enter"&&descartar()}/>
-                                      </div>
-                                    </div>
-                                    <button className="ub ub-err ub-full" onClick={descartar} disabled={savingAcao||!discMotivo.trim()||!parseInt(discQtd)}>
-                                      {savingAcao?<Spin/>:<><Icon n="trash" s={13}/> Descartar {discQtd||0}x</>}
-                                    </button>
-                                  </>}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+  // ── Página: detalhe da variação (ações) ──
+  const PaginaVariacao = () => {
+    const cor = selProd?.cor || PALETTE[0];
+    const v   = selVar;
+    return (
+      <div className="ufd">
+        <Breadcrumb items={[
+          { label:"Produtos", onClick:()=>{ setSelProd(null); setSelVar(null); setModalAcao(null); } },
+          { label:selProd?.nome || "", onClick:()=>{ setSelVar(null); setModalAcao(null); } },
+          { label:`TAM ${v?.tamanho}` },
+        ]}/>
+        <BackBtn onClick={()=>{ setSelVar(null); setModalAcao(null); }} label={`Voltar para ${selProd?.nome}`}/>
+        {/* Info da variação */}
+        <div style={{ background:`${cor}10`, border:`1px solid ${cor}44`, borderRadius:"var(--r)", padding:"18px 20px", marginBottom:20 }}>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+            <div>
+              <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:10, color:`${cor}cc`, letterSpacing:2, textTransform:"uppercase", marginBottom:4 }}>{selProd?.nome}</div>
+              <div style={{ fontFamily:"'Syne',sans-serif", fontSize:18, fontWeight:800 }}>Tamanho {v?.tamanho}</div>
+            </div>
+            <div style={{ textAlign:"right" }}>
+              <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:9, color:"var(--muted)", letterSpacing:2, textTransform:"uppercase", marginBottom:4 }}>em estoque</div>
+              <div style={{ fontFamily:"'Syne',sans-serif", fontSize:48, fontWeight:800, lineHeight:1, color:v?.quantidade>0?cor:"var(--err)" }}>{v?.quantidade||0}</div>
+            </div>
+          </div>
+        </div>
+        {/* Botões de ação */}
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:20 }}>
+          {[
+            { id:"adicionar", l:"+ Estoque",   cls:"ub-ok"   },
+            { id:"enviar",    l:"→ Usuário",   cls:"ub-info" },
+            { id:"descartar", l:"✕ Descartar", cls:"ub-err"  },
+          ].map(a => (
+            <button key={a.id} className={`ub ${a.cls}`}
+              style={{ justifyContent:"center", outline:modalAcao===a.id?"2px solid currentColor":"none", outlineOffset:2 }}
+              onClick={()=>setModalAcao(modalAcao===a.id?null:a.id)}>
+              {a.l}
+            </button>
+          ))}
+        </div>
+        {/* ADICIONAR */}
+        {modalAcao==="adicionar" && (
+          <div className="ufd" style={{ background:"var(--s2)", border:"1px solid rgba(34,197,94,.3)", borderRadius:"var(--r)", padding:"16px", marginBottom:12 }}>
+            <div className="ulbl" style={{ marginBottom:8 }}>Quantas unidades chegaram?</div>
+            <div style={{ display:"flex", gap:10, alignItems:"center", marginBottom:12 }}>
+              <input className="ui ui-num" type="number" min="1" value={aqtd} onChange={e=>setAQtd(e.target.value.replace(/[^0-9]/g,""))}
+                placeholder="0" style={{ flex:1 }} onKeyDown={e=>e.key==="Enter"&&adicionarEstoque()} autoFocus/>
+              {aqtd && parseInt(aqtd)>0 && (
+                <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:12, color:"var(--ok)", whiteSpace:"nowrap" }}>
+                  {v?.quantidade||0} + {aqtd} = <strong>{(v?.quantidade||0)+parseInt(aqtd)}</strong>
+                </div>
+              )}
+            </div>
+            <button className="ub ub-ok ub-full" onClick={adicionarEstoque} disabled={savingAcao||!aqtd||parseInt(aqtd)<1}>
+              {savingAcao?<Spin/>:<><Icon n="plus" s={14}/> Adicionar {aqtd||0} ao estoque</>}
+            </button>
           </div>
         )}
-      </Drawer>
+        {/* ENVIAR */}
+        {modalAcao==="enviar" && (
+          <div className="ufd" style={{ background:"var(--s2)", border:"1px solid rgba(56,189,248,.3)", borderRadius:"var(--r)", padding:"16px", marginBottom:12 }}>
+            {(v?.quantidade||0)===0
+              ? <div style={{ fontFamily:"var(--mono)",fontSize:12,color:"var(--err)",display:"flex",alignItems:"center",gap:7 }}><Icon n="warn" s={13} c="var(--err)"/> Estoque zerado.</div>
+              : <>
+                  <div style={{ display:"flex", gap:8, marginBottom:10, alignItems:"flex-end" }}>
+                    <div style={{ width:90 }}>
+                      <div className="ulbl">Quantidade</div>
+                      <input className="ui ui-num" type="number" min="1" max={v?.quantidade} value={sendQtd} onChange={e=>setSendQtd(e.target.value.replace(/[^0-9]/g,""))} style={{ padding:"6px 8px" }}/>
+                    </div>
+                    <div style={{ flex:1 }}>
+                      <div className="ulbl">Buscar usuário</div>
+                      <Search value={userSearch} onChange={setUSearch} placeholder="Nome..."/>
+                    </div>
+                  </div>
+                  <div style={{ maxHeight:220, overflowY:"auto", border:"1px solid var(--b)", borderRadius:"var(--rs)", marginBottom:12 }}>
+                    {[...usersFiltered].sort((a,b)=>a.nome.localeCompare(b.nome)).map(u=>{
+                      const uc=u.cor||PALETTE[0];
+                      return (
+                        <div key={u.id} onClick={()=>setSendUser(u.id)}
+                          style={{ display:"flex",alignItems:"center",gap:9,padding:"10px 12px",cursor:"pointer",borderBottom:"1px solid var(--b)",background:sendUser===u.id?"rgba(56,189,248,.08)":"transparent",transition:"background .1s" }}>
+                          <div style={{ width:30,height:30,borderRadius:"50%",background:`${uc}22`,border:`2px solid ${uc}44`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
+                            <span style={{ fontFamily:"'Syne',sans-serif",fontSize:14,fontWeight:800,color:uc }}>{u.nome.charAt(0)}</span>
+                          </div>
+                          <span style={{ flex:1,fontSize:13,fontWeight:600,color:sendUser===u.id?"var(--info)":"var(--text)" }}>{u.nome}</span>
+                          {u.setor&&<SetorChip setor={u.setor} cor={u.cor}/>}
+                          {sendUser===u.id&&<Icon n="check" s={14} c="var(--info)"/>}
+                        </div>
+                      );
+                    })}
+                    {usersFiltered.length===0&&<div style={{padding:12,fontSize:11,color:"var(--muted)",fontFamily:"var(--mono)"}}>Nenhum usuário</div>}
+                  </div>
+                  <button className="ub ub-info ub-full" onClick={enviarParaUser} disabled={savingAcao||!sendUser||!parseInt(sendQtd)}>
+                    {savingAcao?<Spin/>:<><Icon n="send" s={14}/> Enviar {sendQtd||0}x para usuário</>}
+                  </button>
+                </>}
+          </div>
+        )}
+        {/* DESCARTAR */}
+        {modalAcao==="descartar" && (
+          <div className="ufd" style={{ background:"var(--s2)", border:"1px solid rgba(244,63,94,.3)", borderRadius:"var(--r)", padding:"16px", marginBottom:12 }}>
+            {(v?.quantidade||0)===0
+              ? <div style={{fontFamily:"var(--mono)",fontSize:12,color:"var(--err)",display:"flex",alignItems:"center",gap:7}}><Icon n="warn" s={13} c="var(--err)"/> Estoque zerado.</div>
+              : <>
+                  <div style={{ display:"flex", gap:8, marginBottom:12, alignItems:"flex-end" }}>
+                    <div style={{ width:90 }}>
+                      <div className="ulbl">Quantidade</div>
+                      <input className="ui ui-num" type="number" min="1" max={v?.quantidade} value={discQtd} onChange={e=>setDiscQtd(e.target.value.replace(/[^0-9]/g,""))} style={{ padding:"6px 8px" }}/>
+                    </div>
+                    <div style={{ flex:1 }}>
+                      <div className="ulbl">Motivo *</div>
+                      <input className="ui" value={discMotivo} onChange={e=>setDiscM(e.target.value)} placeholder="Ex: rasgado, danificado..." onKeyDown={e=>e.key==="Enter"&&descartar()}/>
+                    </div>
+                  </div>
+                  <button className="ub ub-err ub-full" onClick={descartar} disabled={savingAcao||!discMotivo.trim()||!parseInt(discQtd)}>
+                    {savingAcao?<Spin/>:<><Icon n="trash" s={14}/> Descartar {discQtd||0}x</>}
+                  </button>
+                </>}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ── Renderiza a página correta ──
+  return (
+    <div>
+      {selVar  ? <PaginaVariacao/> : selProd ? <PaginaProduto/> : <PaginaLista/>}
 
       {/* Modal editar produto */}
       {modalEditProd && (
@@ -982,8 +1065,9 @@ function TabUsuarios({ usuarios, itens, variacoes, produtos, setoresCfg, onRefre
 
   const userItens = selUser ? itens.filter(i=>i.userId===selUser.id) : [];
 
-  return (
-    <div>
+  // Página: lista de usuários
+  const PaginaLista = () => (
+    <div className="ufd">
       {/* Barra */}
       <div style={{ display:"flex", gap:10, marginBottom:18, alignItems:"center", flexWrap:"wrap" }}>
         <div style={{ flex:1, minWidth:180 }}><Search value={search} onChange={setSearch} placeholder="Buscar usuário ou setor..."/></div>
@@ -1072,57 +1156,88 @@ function TabUsuarios({ usuarios, itens, variacoes, produtos, setoresCfg, onRefre
           </div>
         )}
 
-      {/* Drawer do usuário */}
-      <Drawer open={!!selUser} onClose={()=>{setSelUser(null);setDiscItem(null);setDiscMU("");}}
-        title={selUser?.nome||""} sub={selUser?.setor||""}>
-        {selUser && (
-          <div>
-            <div className="usec">Uniformes atribuídos ({userItens.reduce((s,i)=>s+(i.qtd||1),0)} peças)</div>
+    </div>
+  );
 
-            {userItens.length === 0
-              ? <div style={{ fontFamily:"var(--mono)",fontSize:12,color:"var(--muted)",padding:"20px",textAlign:"center",border:"1px dashed var(--b)",borderRadius:"var(--rs)" }}>
-                  Nenhum uniforme atribuído.
-                </div>
-              : userItens.map(item => {
-                  const cor   = item.cor || PALETTE[0];
-                  const isDisc = discItem?.id === item.id;
-                  return (
-                    <div key={item.id} className="irow" style={{ marginBottom:8 }}>
-                      <div style={{ width:36,height:36,borderRadius:"var(--rs)",background:`${cor}18`,border:`2px solid ${cor}33`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
-                        <Icon n="shirt" s={18} c={cor}/>
-                      </div>
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:13, fontWeight:600, color:cor }}>{item.produtoNome}</div>
-                        <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:10, color:"var(--muted)", marginTop:2 }}>
-                          TAM {item.tamanho} · {fmt(item.data)}
-                        </div>
-                        {isDisc && (
-                          <div className="ufd" style={{ marginTop:8 }}>
-                            <input className="ui" value={discMotivoU} onChange={e=>setDiscMU(e.target.value)} placeholder="Motivo do descarte..." style={{ marginBottom:6, fontSize:12 }} onKeyDown={e=>e.key==="Enter"&&descartarDoUser()}/>
-                            <div style={{ display:"flex", gap:6 }}>
-                              <button className="ub ub-err ub-sm ub-full" onClick={descartarDoUser}>Confirmar descarte</button>
-                              <button className="ub ub-ghost ub-sm" onClick={()=>{setDiscItem(null);setDiscMU("");}}>✕</button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      <div style={{ fontFamily:"'Syne',sans-serif",fontSize:20,fontWeight:700,color:"var(--info)",flexShrink:0 }}>×{item.qtd||1}</div>
-                      {!isDisc && (
-                        <div style={{ display:"flex", flexDirection:"column", gap:5, flexShrink:0 }}>
-                          <button className="ub ub-ok ub-sm" style={{ fontSize:10,padding:"4px 8px" }} onClick={()=>devolverEstoque(item)}>
-                            <Icon n="refresh" s={11}/> Estoque
-                          </button>
-                          <button className="ub ub-err ub-sm" style={{ fontSize:10,padding:"4px 8px" }} onClick={()=>{setDiscItem(item);setDiscMU("");}}>
-                            <Icon n="trash" s={11}/> Descartar
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+  // ── Página: detalhe do usuário ──
+  const PaginaUsuario = () => {
+    const cor = selUser?.cor || PALETTE[0];
+    return (
+      <div className="ufd">
+        <Breadcrumb items={[
+          { label:"Usuários", onClick:()=>{ setSelUser(null); setDiscItem(null); setDiscMU(""); } },
+          { label:selUser?.nome || "" },
+        ]}/>
+        <BackBtn onClick={()=>{ setSelUser(null); setDiscItem(null); setDiscMU(""); }} label="Voltar para usuários"/>
+        {/* Card do usuário */}
+        <div style={{ display:"flex", alignItems:"center", gap:14, padding:"16px", background:"var(--s2)", border:`1px solid ${cor}44`, borderRadius:"var(--r)", marginBottom:20 }}>
+          <div className="uavatar" style={{ background:`${cor}22`, border:`2px solid ${cor}55`, color:cor, width:52, height:52, fontSize:24 }}>
+            {selUser?.nome?.charAt(0).toUpperCase()}
           </div>
-        )}
-      </Drawer>
+          <div style={{ flex:1 }}>
+            <div style={{ fontFamily:"'Syne',sans-serif", fontSize:20, fontWeight:800 }}>{selUser?.nome}</div>
+            {selUser?.setor && <div style={{ marginTop:4 }}><SetorChip setor={selUser.setor} cor={cor}/></div>}
+          </div>
+          <div style={{ display:"flex", gap:6 }}>
+            <button className="ub ub-ghost ub-sm" onClick={()=>{ setEditUser(selUser); setEditNome(selUser.nome); setEditSetor(selUser.setor||""); setEditCor(selUser.cor||PALETTE[0]); }}>
+              <Icon n="edit" s={13}/> Editar
+            </button>
+            <button className="ub ub-err ub-sm" onClick={()=>excluirUser(selUser)}>
+              <Icon n="trash" s={13}/> Excluir
+            </button>
+          </div>
+        </div>
+        {/* Itens */}
+        <div className="usec">Uniformes atribuídos ({userItens.reduce((s,i)=>s+(i.qtd||1),0)} peças)</div>
+        {userItens.length === 0
+          ? <div style={{ fontFamily:"var(--mono)",fontSize:12,color:"var(--muted)",padding:"20px",textAlign:"center",border:"1px dashed var(--b)",borderRadius:"var(--rs)" }}>
+              Nenhum uniforme atribuído a este usuário.
+            </div>
+          : userItens.map(item => {
+              const icor    = item.cor || PALETTE[0];
+              const isDisc  = discItem?.id === item.id;
+              return (
+                <div key={item.id} className="irow" style={{ marginBottom:8 }}>
+                  <div style={{ width:38,height:38,borderRadius:"var(--rs)",background:`${icor}18`,border:`2px solid ${icor}33`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0 }}>
+                    <Icon n="shirt" s={18} c={icor}/>
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:icor }}>{item.produtoNome}</div>
+                    <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:10, color:"var(--muted)", marginTop:2 }}>
+                      TAM {item.tamanho} · {fmt(item.data)}
+                    </div>
+                    {isDisc && (
+                      <div className="ufd" style={{ marginTop:8 }}>
+                        <input className="ui" value={discMotivoU} onChange={e=>setDiscMU(e.target.value)} placeholder="Motivo do descarte..." style={{ marginBottom:6, fontSize:12 }} autoFocus onKeyDown={e=>e.key==="Enter"&&descartarDoUser()}/>
+                        <div style={{ display:"flex", gap:6 }}>
+                          <button className="ub ub-err ub-sm ub-full" onClick={descartarDoUser}>Confirmar descarte</button>
+                          <button className="ub ub-ghost ub-sm" onClick={()=>{setDiscItem(null);setDiscMU("");}}>✕</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ fontFamily:"'Syne',sans-serif",fontSize:22,fontWeight:700,color:"var(--info)",flexShrink:0 }}>×{item.qtd||1}</div>
+                  {!isDisc && (
+                    <div style={{ display:"flex", flexDirection:"column", gap:5, flexShrink:0 }}>
+                      <button className="ub ub-ok ub-sm" style={{ fontSize:10,padding:"5px 9px" }} onClick={()=>devolverEstoque(item)}>
+                        <Icon n="refresh" s={11}/> Estoque
+                      </button>
+                      <button className="ub ub-err ub-sm" style={{ fontSize:10,padding:"5px 9px" }} onClick={()=>{setDiscItem(item);setDiscMU("");}}>
+                        <Icon n="trash" s={11}/> Descartar
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+      </div>
+    );
+  };
+
+  // ── Renderiza a página correta ──
+  return (
+    <div>
+      {selUser ? <PaginaUsuario/> : <PaginaLista/>}
 
       {/* Modal editar usuário */}
       {editUser && (
