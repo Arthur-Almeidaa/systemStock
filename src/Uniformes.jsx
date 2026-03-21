@@ -1246,6 +1246,7 @@ export function Uniformes() {
   // ── RENOVAR: zera TUDO dos uniformes ──
   const [renovando, setRenovando] = useState(false);
   const [showConfirmRenovar, setShowConfirmRenovar] = useState(false);
+  const [pinRenovar, setPinRenovar] = useState("");
 
   const renovarTudo = async () => {
     setRenovando(true);
@@ -1259,6 +1260,7 @@ export function Uniformes() {
       }
       addToast("Banco de uniformes zerado! Comece do zero.", "success");
       setShowConfirmRenovar(false);
+      setPinRenovar("");
       load();
     } catch(e) { addToast("Erro ao renovar: "+e.message, "error"); }
     finally { setRenovando(false); }
@@ -1300,11 +1302,11 @@ export function Uniformes() {
 
       {/* Modal confirmação renovar */}
       {showConfirmRenovar && (
-        <div className="mov" onClick={e=>e.target===e.currentTarget&&setShowConfirmRenovar(false)}>
+        <div className="mov" onClick={e=>e.target===e.currentTarget&&(setShowConfirmRenovar(false)||setPinRenovar(""))}>
           <div className="mo ufd" style={{ border:"1px solid var(--err)" }}>
             <div className="mo-head" style={{ borderColor:"var(--err)" }}>
               <span className="mo-title" style={{ color:"var(--err)" }}>⚠ RENOVAR UNIFORMES</span>
-              <button className="ub ub-ghost ub-icon ub-sm" onClick={()=>setShowConfirmRenovar(false)}><Icon n="x" s={14}/></button>
+              <button className="ub ub-ghost ub-icon ub-sm" onClick={()=>{setShowConfirmRenovar(false);setPinRenovar("");}}><Icon n="x" s={14}/></button>
             </div>
             <div className="mo-body">
               <div style={{ background:"rgba(244,63,94,.06)", border:"1px solid rgba(244,63,94,.25)", borderRadius:"var(--rs)", padding:"12px 14px", marginBottom:16, fontFamily:"'JetBrains Mono',monospace", fontSize:11, color:"var(--err)", lineHeight:1.8 }}>
@@ -1316,14 +1318,31 @@ export function Uniformes() {
                 · Todo o log<br/>
                 <strong>Só afeta o módulo Uniformes.</strong>
               </div>
-              <div style={{ fontFamily:"'Plus Jakarta Sans',sans-serif", fontSize:13, color:"var(--muted)", marginBottom:16 }}>
-                Você começará do zero. Tem certeza?
+              <div style={{ marginBottom:16 }}>
+                <div className="ulbl" style={{ marginBottom:8 }}>Digite a senha para confirmar</div>
+                <input
+                  className="ui"
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={pinRenovar}
+                  onChange={e => setPinRenovar(e.target.value.replace(/\D/g,"").slice(0,4))}
+                  onKeyDown={e => e.key==="Enter" && pinRenovar==="4510" && renovarTudo()}
+                  placeholder="••••"
+                  autoFocus
+                  style={{ textAlign:"center", fontFamily:"'Syne',sans-serif", fontSize:28, fontWeight:800, letterSpacing:12, maxWidth:160 }}
+                />
+                {pinRenovar.length === 4 && pinRenovar !== "4510" && (
+                  <div style={{ fontFamily:"'JetBrains Mono',monospace", fontSize:11, color:"var(--err)", marginTop:8, display:"flex", alignItems:"center", gap:6 }}>
+                    <Icon n="warn" s={12} c="var(--err)"/> Senha incorreta.
+                  </div>
+                )}
               </div>
               <div style={{ display:"flex", gap:8 }}>
-                <button className="ub ub-err ub-full" onClick={renovarTudo} disabled={renovando}>
-                  {renovando ? <><Spin/> Zerando...</> : <><Icon n="refresh" s={14}/> Sim, renovar tudo</>}
+                <button className="ub ub-err ub-full" onClick={renovarTudo} disabled={renovando || pinRenovar !== "4510"}>
+                  {renovando ? <><Spin/> Zerando...</> : <><Icon n="refresh" s={14}/> Renovar tudo</>}
                 </button>
-                <button className="ub ub-ghost" onClick={()=>setShowConfirmRenovar(false)}>Cancelar</button>
+                <button className="ub ub-ghost" onClick={()=>{setShowConfirmRenovar(false);setPinRenovar("");}}>Cancelar</button>
               </div>
             </div>
           </div>
