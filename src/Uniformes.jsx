@@ -80,6 +80,7 @@ const CSS = `
     color:var(--text);
   }
   .ur *{box-sizing:border-box;margin:0;padding:0;}
+  .ur input,.ur select,.ur textarea{font-size:16px !important;-webkit-text-size-adjust:100%;}
 
   /* Tabs */
   .ur-tabs{display:flex;gap:3px;background:var(--s2);border:1px solid var(--b);border-radius:12px;padding:4px;width:fit-content;margin-bottom:22px;}
@@ -104,11 +105,11 @@ const CSS = `
   .ub-icon{padding:7px;border-radius:var(--rs);}
 
   /* Inputs */
-  .ui{width:100%;background:var(--s2);border:1px solid var(--b2);color:var(--text);padding:10px 13px;border-radius:var(--rs);font-family:'Plus Jakarta Sans',sans-serif;font-size:13px;outline:none;transition:border-color .2s;}
+  .ui{width:100%;background:var(--s2);border:1px solid var(--b2);color:var(--text);padding:10px 13px;border-radius:var(--rs);font-family:'Plus Jakarta Sans',sans-serif;font-size:16px;outline:none;transition:border-color .2s;-webkit-text-size-adjust:100%;}
   .ui:focus{border-color:var(--acc);}
   .ui::placeholder{color:var(--muted);}
-  .ui-mono{font-family:'JetBrains Mono',monospace;font-size:13px;}
-  .ui-num{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;text-align:center;padding:8px 13px;}
+  .ui-mono{font-family:'JetBrains Mono',monospace;font-size:16px;}
+  .ui-num{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;text-align:center;padding:8px 13px;-webkit-text-size-adjust:100%;}
 
   /* Card produto */
   .pc{background:var(--s1);border:1px solid var(--b);border-radius:var(--r);cursor:pointer;transition:border-color .2s,transform .2s,box-shadow .2s;overflow:hidden;position:relative;}
